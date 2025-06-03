@@ -1,15 +1,42 @@
-# RoguelikeMultiplayer
+# Rust Multiplayer Game
 
-Idea to be started soon:
-- roguelike game style: terminal, ascii
-- multiplayer capabilities
-- client with account management
-- email confirmation, login, password
-- Diesel ORM for Database
-- server + database shipped with containers
-- client with [bracket-lib](https://bfnightly.bracketproductions.com/bracket-lib/what_is_it.html)
-- openworld - willages to travel to. Traveling probably will be quite fast. Maybe add delays between steps.
-- Mining, woodcutting like Runescape + crafting. Trees, ore veins will be probably single colored characters, but inventory itemswill be more verbose (2z2 characters lol)
-- dungeons are generated per player (or party in future). aybe some enemies in dungeons, but for sure traps. Light effects, torch and similar. Player will have to find reward chest. COmbat level? How to do this with player looking like this '@' ? Exori #Tibia hah
-- player can fainy indungeon similar to stardew valley
-- dungeons will require some combat level or skills, lets say woodcutting to access forest dungeon, mining to access mine dungeon. Dungeons willgrant experinace is skills.
+One day I will create my own game. Maybe this time!
+
+## What this game should look like?
+
+General concepts:
+- Tibia features:
+  - graphics: 2D X/Y aligned, fake Z depth,
+  - retro graphics
+  - tile snapped
+  - rare loot
+  - tresure chests
+  - items tossing on floor
+- Runescape:
+  - crafting 
+  - resources gathering
+  - grinding resources
+  - resource, production, banking, trading areas
+  - fixed inventory, maybe slight variation - bottleneck
+- WoW:
+  - Money system
+  - Resource sourceses renewable with longer intervals
+- Added:
+  - small combat, maybe only hunting
+  - crafting grindig less devastating,
+  - quests, dungeons
+
+To consider:
+- food needed?
+- is dungeon combat based to get some resources?
+- dungeon as crafting challenge, example: gather some dungeon specific resources, craft some parts. Shipyard dungeon - gather wood, create wooden planks, repair the deck. Workshop dungeon: gather waste metal, craft cogs, repar machine. Mybe some puzzle to solve to add hardness.
+
+Techs:
+- multiplayer - why? Good separation of logic, character || client, graphics
+- web cleint via browser - why? Easy access, but not sure if mobile friendly, rather mouse + keybord dedicated.
+- macroquad
+
+## Plans
+
+Roadmap:
+- [ ] Client entry page with Wasm and basic GUI elements lib
