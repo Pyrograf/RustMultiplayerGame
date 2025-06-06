@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use macroquad::prelude::*;
 
-use RustMultiplayerGame::gui::{constrain_screen_size, GuiSettings, launcher::GuiLauncher};
+use game_client::gui::{constrain_screen_size, GuiSettings, launcher::GuiLauncher};
 
 #[macroquad::main("Client")]
 async fn main() {

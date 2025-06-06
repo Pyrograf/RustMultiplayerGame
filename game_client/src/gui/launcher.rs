@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::fmt::{Debug, Formatter};
 use std::ops::Mul;
 use std::rc::Rc;
+use std::time::Duration;
 use macroquad::color::Color;
 use macroquad::hash;
 use macroquad::math::{vec2, RectOffset, Vec2};
@@ -134,6 +135,7 @@ impl GuiLauncher {
                                      register_data.str_input_password_1,
                                      register_data.str_input_password_2,
                             );
+                            std::thread::sleep(Duration::from_secs(1));
                             // TODO
                         }
 
