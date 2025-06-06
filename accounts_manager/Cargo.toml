@@ -8,9 +8,11 @@ tokio = { workspace = true }
 thiserror = { workspace = true }
 
 axum = { version = "0.8.4" }
+reqwest = { version = "0.12.19", features = ["json"] }
 
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 tower-http = { version = "0.6.2", features = ["trace"] }
 
 ctrlc = { workspace = true }
+serde = { version = "1.0.219", features = ["derive"] }

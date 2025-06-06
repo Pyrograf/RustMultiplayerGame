@@ -7,12 +7,13 @@ use tower_http::trace::{
     DefaultOnResponse,
     TraceLayer
 };
-use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
 
 pub mod router;
 pub mod app_data;
 pub mod handlers;
+pub mod client;
+mod requests;
+mod testing;
 
 #[derive(Debug)]
 pub struct AccountsManagerServer {
@@ -88,6 +89,10 @@ impl AccountsManagerServer {
         self.await_shutdown().await
     }
 
+    pub fn get_address(&self) -> &std::net::SocketAddr {
+        &self.address
+    }
+
     pub fn get_url(&self) -> String {
         format!("http://{}", self.address)
     }
@@ -96,23 +101,13 @@ impl AccountsManagerServer {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::OnceLock;
     use std::time::Duration;
+    use crate::testing::tests_trace_setup;
     use super::*;
-
-    static COMMON_SETUP_INIT: OnceLock<()> = OnceLock::new();
-
-    fn common_test_setup() {
-        let _ = COMMON_SETUP_INIT.get_or_init(|| tracing_subscriber::registry()
-            .with(tracing_subscriber::EnvFilter::new("debug"))
-            .with(tracing_subscriber::fmt::layer())
-            .init()
-        );
-    }
 
     #[tokio::test]
     async fn test_running_dropped_shutdown() {
-        common_test_setup();
+        tests_trace_setup();
 
         {
             let server = AccountsManagerServer::run().await.unwrap();
@@ -123,7 +118,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_running_graceful_shutdown() {
-        common_test_setup();
+        tests_trace_setup();
 
         let server = AccountsManagerServer::run().await.unwrap();
         tokio::time::sleep(Duration::from_millis(100)).await;
