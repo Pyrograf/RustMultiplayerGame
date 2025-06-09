@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct AccountsServerStatus {
-    pub motd: String
+pub struct CreateAccountRequest {
+    pub username: String,
+    pub password: String,
 }

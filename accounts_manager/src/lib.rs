@@ -1,5 +1,6 @@
 use std::io::ErrorKind;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 use crate::app_data::AppData;
 use tower_http::trace::{
     DefaultMakeSpan,
@@ -13,7 +14,9 @@ pub mod app_data;
 pub mod handlers;
 pub mod client;
 pub mod requests;
+pub mod responses;
 pub mod account;
+pub mod services;
 mod testing;
 
 #[derive(Debug)]
@@ -21,13 +24,13 @@ pub struct AccountsManagerServer {
     task_handle: tokio::task::JoinHandle<Result<(), std::io::Error>>,
     shutdown_tx: Option<tokio::sync::oneshot::Sender<()>>,
     address: std::net::SocketAddr,
-    app_data: Arc<AppData>,
+    app_data: Arc<Mutex<AppData>>,
 }
 
 impl AccountsManagerServer {
     pub async fn run() -> tokio::io::Result<Self> {
 
-        let app_data = Arc::new(AppData::default());
+        let app_data = Arc::new(Mutex::new(AppData::default()));
 
         let app = router::get_router(app_data.clone())
             .layer(TraceLayer::new_for_http()

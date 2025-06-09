@@ -3,7 +3,7 @@ use crate::account::{Account, AccountsManager};
 
 #[derive(Debug)]
 pub struct AppData {
-    accounts_manager: AccountsManager,
+    pub accounts_manager: AccountsManager,
 }
 
 impl Default for AppData {

@@ -1,18 +1,20 @@
+use std::borrow::Borrow;
 use argon2::password_hash::rand_core::OsRng;
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, Serialize, Deserialize)]
 pub enum AccountError {
-    #[error("PasswordHashError reason= {0}")]
+    #[error("Password hash error, reason= {0}")]
     PasswordHashError(String), // argon2::password_hash::Error is not std::error::Error based
 
-    #[error("UsernameAlreadyExists")]
+    #[error("Username already exists")]
     UsernameAlreadyExists,
 
-    #[error("UsernameNotFound")]
+    #[error("Username not found")]
     UsernameNotFound,
 }
 
@@ -33,6 +35,12 @@ impl Eq for Account {}
 impl Hash for Account {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.username.hash(state)
+    }
+}
+
+impl Borrow<str> for Account {
+    fn borrow(&self) -> &str {
+        self.username.as_str()
     }
 }
 
@@ -65,18 +73,31 @@ impl AccountsManager {
         }
     }
 
-    fn find_account_by_username(&self, username: &str) -> Option<&Account> {
+    pub fn find_account_by_username(&self, username: &str) -> Option<&Account> {
         self.accounts
             .iter()
             .find(|account| account.username == username)
     }
 
     pub fn add_account(&mut self, new_account: Account) -> Result<(), AccountError> {
+        tracing::debug!("Adding new account {:?}", new_account);
         if self.accounts.insert(new_account) {
             Ok(())
         } else {
             Err(AccountError::UsernameAlreadyExists)
         }
+    }
+
+    pub fn remove_account(&mut self, username: &str) -> Result<(), AccountError> {
+        tracing::debug!("Removing account with username {}", username);
+        if self.accounts.remove(username) {
+            Ok(())
+        } else {
+            Err(AccountError::UsernameNotFound)
+        }
+    }
+    pub fn count(&self) -> usize {
+        self.accounts.len()
     }
 }
 
@@ -105,7 +126,7 @@ fn verify_password(
 
 #[cfg(test)]
 mod tests {
-    use crate::account::{hash_password, verify_password, Account, AccountError, AccountsManager};
+    use crate::account::{hash_password, verify_password, Account, AccountsManager, AccountError};
 
     #[test]
     fn test_hashing_empty_password() {
@@ -163,8 +184,9 @@ mod tests {
     }
 
     #[test]
-    fn test_accounts_manager_appending_accounts() {
+    fn test_accounts_manager_appending_accounts_and_counting() {
         let mut accounts_manager = AccountsManager::new();
+        assert_eq!(accounts_manager.count(), 0);
 
         let account_1 = Account::new("User1".to_string(), "Password12345!@#").unwrap();
         let account_2 = Account::new("User2".to_string(), "Password12345!@#").unwrap();
@@ -172,10 +194,34 @@ mod tests {
             Account::new(account_1.username.clone(), "Password12345!@#").unwrap();
 
         accounts_manager.add_account(account_1).unwrap();
+        assert_eq!(accounts_manager.count(), 1);
         accounts_manager.add_account(account_2).unwrap();
+        assert_eq!(accounts_manager.count(), 2);
 
         // Account with the same username
         let result = accounts_manager.add_account(account_3_username_already_used);
         assert!(matches!(result, Err(AccountError::UsernameAlreadyExists)), "result == {:?}", result);
+        assert_eq!(accounts_manager.count(), 2);
+    }
+
+    #[test]
+    fn test_accounts_manager_removing_accounts() {
+        let mut accounts_manager = AccountsManager::new();
+
+        let account_1 = Account::new("User1".to_string(), "Password12345!@#").unwrap();
+        let account_2 = Account::new("User2".to_string(), "Password12345!@#").unwrap();
+
+        accounts_manager.add_account(account_1).unwrap();
+        assert_eq!(accounts_manager.count(), 1);
+        accounts_manager.add_account(account_2).unwrap();
+        assert_eq!(accounts_manager.count(), 2);
+
+        assert!(matches!(accounts_manager.remove_account("User").unwrap_err(), AccountError::UsernameNotFound));
+        assert_eq!(accounts_manager.count(), 2);
+
+        accounts_manager.remove_account("User1").unwrap();
+        assert_eq!(accounts_manager.count(), 1);
+        accounts_manager.remove_account("User2").unwrap();
+        assert_eq!(accounts_manager.count(), 0);
     }
 }

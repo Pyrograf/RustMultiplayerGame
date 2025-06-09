@@ -4,7 +4,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use user_management::AccountsManagerServer;
 
 #[tokio::main]
-async  fn main() {
+async fn main() {
     println!("Accounts server!");
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new("debug"))

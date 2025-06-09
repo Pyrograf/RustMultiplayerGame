@@ -1838,6 +1838,7 @@ dependencies = [
  "rand_core",
  "reqwest",
  "serde",
+ "serde_json",
  "thiserror",
  "tokio",
  "tower-http",
