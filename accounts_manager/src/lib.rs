@@ -12,7 +12,8 @@ pub mod router;
 pub mod app_data;
 pub mod handlers;
 pub mod client;
-mod requests;
+pub mod requests;
+pub mod account;
 mod testing;
 
 #[derive(Debug)]
@@ -106,7 +107,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_running_dropped_shutdown() {
+    async fn test_dropping_server_to_gracefully_shutdown() {
         tests_trace_setup();
 
         {

@@ -1,12 +1,15 @@
+use std::collections::HashSet;
+use crate::account::{Account, AccountsManager};
+
 #[derive(Debug)]
 pub struct AppData {
-    _dummy: u32
+    accounts_manager: AccountsManager,
 }
 
 impl Default for AppData {
     fn default() -> Self {
         Self {
-            _dummy: 0
+            accounts_manager:  AccountsManager::new(),
         }
     }
 }
