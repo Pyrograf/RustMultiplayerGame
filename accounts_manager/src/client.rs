@@ -1,8 +1,7 @@
-use std::time::Duration;
+use crate::requests::{CreateAccountRequest, DeleteAccountRequestBody};
+use crate::responses::{AccountsServerStatus, ApiError};
 use reqwest::{Client as HttpClient, Response, StatusCode};
-use crate::account::AccountError;
-use crate::requests::CreateAccountRequest;
-use crate::responses::AccountsServerStatus;
+use std::time::Duration;
 
 pub struct AccountsManagerClient {
     base_url: String,
@@ -15,33 +14,37 @@ pub enum AccountsManagerClientError {
     ReqwestError(#[from] reqwest::Error),
 
     #[error(transparent)]
-    AccountError(#[from] AccountError),
+    ApiError(#[from] ApiError),
 
-    #[error("OtherError, reason = {0}")]
-    OtherError(String),
-
+    #[error("OtherError, status_code={status}, reason = {reason}")]
+    OtherError { status: StatusCode, reason: String },
 }
 
+pub type AccountsManagerResult<T> = Result<T, AccountsManagerClientError>;
+
 impl AccountsManagerClient {
-    pub fn new(address: &str) -> Result<Self, AccountsManagerClientError> {
+    pub fn new(address: &str) -> AccountsManagerResult<Self> {
         let base_url = format!("http://{}", address.trim_end_matches('/'));
         let http_client = HttpClient::builder()
             .timeout(Duration::from_secs(5))
             .build()?;
 
-        tracing::info!("Creatied client with base_url='{base_url}'.");
+        tracing::info!("Created client with base_url='{base_url}'.");
 
-        Ok(
-            Self {
-                base_url,
-                http_client
-            }
-        )
+        Ok(Self {
+            base_url,
+            http_client,
+        })
     }
 
-    pub async fn get_server_status(&self) -> Result<AccountsServerStatus, AccountsManagerClientError> {
+    pub async fn get_server_status(&self) -> AccountsManagerResult<AccountsServerStatus> {
         let url = format!("{}/", self.base_url);
-        let resp = self.http_client.get(&url).send().await?.error_for_status()?;
+        let resp = self
+            .http_client
+            .get(&url)
+            .send()
+            .await?
+            .error_for_status()?;
         let status = resp.json::<AccountsServerStatus>().await?;
         Ok(status)
     }
@@ -49,53 +52,74 @@ impl AccountsManagerClient {
     pub async fn request_create_account(
         &self,
         username: String,
-        password: String
-    ) -> Result<(), AccountsManagerClientError> {
+        password: String,
+    ) -> AccountsManagerResult<()> {
         let url = format!("{}/api/account/create", self.base_url);
-        let request_payload = CreateAccountRequest {
-            username,
-            password
-        };
-        let resp= self.http_client
+        let request_payload = CreateAccountRequest { username, password };
+        let resp = self
+            .http_client
             .post(&url)
             .json(&request_payload)
-            .send().await?;
+            .send()
+            .await?;
 
-        let status =  resp.status();
+        Self::handle_account_manage_response(resp, StatusCode::CREATED).await
+    }
 
-        match resp.status() {
-            StatusCode::CREATED => Ok(()),
-            StatusCode::CONFLICT | StatusCode::BAD_REQUEST | StatusCode::INTERNAL_SERVER_ERROR => {
-                // Try to parse JSON error if possible
-                let error_text = resp.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+    pub async fn request_delete_account(
+        &self,
+        username: String,
+        password: String,
+    ) -> AccountsManagerResult<()> {
+        let url = format!("{}/api/accounts/{}", self.base_url, username);
+        let request_payload = DeleteAccountRequestBody { password };
+        let resp = self
+            .http_client
+            .delete(&url)
+            .json(&request_payload)
+            .send()
+            .await?;
 
-                // Optional: deserialize to AccountError if your server returns structured errors
-                // let account_error: Result<AccountError, _> = serde_json::from_str(&error_text);
-                // match account_error {
-                //     Ok(err) => Err(AccountsManagerClientError::AccountError(err)),
-                //     Err(_) => Err(AccountsManagerClientError::OtherError(error_text)),
-                // }
-                // TODO
-                Err(AccountsManagerClientError::OtherError(error_text))
-            }
-            _ => {
-                let error_text = resp.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-                Err(AccountsManagerClientError::OtherError(format!(
-                    "Unexpected status code {}: {}",
-                    status,
-                    error_text
-                )))
-            }
+        Self::handle_account_manage_response(resp, StatusCode::OK).await
+    }
+
+    async fn handle_account_manage_response(
+        resp: Response,
+        expected_status: StatusCode
+    ) -> AccountsManagerResult<()> {
+        let status = resp.status();
+        if expected_status == status {
+            Ok(())
+        } else {
+            let reason = resp.text().await?;
+            Err(match serde_json::from_str::<ApiError>(&reason) {
+                Ok(err) => err.into(),
+                Err(_) => AccountsManagerClientError::OtherError { status, reason },
+            })
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::client::AccountsManagerClient;
+    use crate::client::{AccountsManagerClient, AccountsManagerClientError};
 
     #[test]
-    fn text_client_creation() {
+    fn text_client_creation_not_connected_yet() {
         let _ = AccountsManagerClient::new("127.0.0.1:1234").unwrap();
+    }
+
+    #[tokio::test]
+    async fn text_client_requesting_not_existing_server() {
+        let dummy_client = AccountsManagerClient::new("127.255.255.255:1234").unwrap();
+        let request_err = dummy_client.get_server_status().await.unwrap_err();
+
+        match request_err {
+            AccountsManagerClientError::ReqwestError(reqwest_err) => {
+                assert!(reqwest_err.is_connect()); // Watch out, this dude returns true if error is connection related lol
+                assert!(format!("{reqwest_err:?}").contains("ConnectError"));
+            }
+            _ => panic!("Should not get ReqwestError!"),
+        }
     }
 }

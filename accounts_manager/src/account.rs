@@ -6,9 +6,9 @@ use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, thiserror::Error, Serialize, Deserialize)]
+#[derive(Debug, thiserror::Error, Serialize, Deserialize, PartialEq, Clone)]
 pub enum AccountError {
-    #[error("Password hash error, reason= {0}")]
+    #[error("Password hash error, reason = '{0}'")]
     PasswordHashError(String), // argon2::password_hash::Error is not std::error::Error based
 
     #[error("Username already exists")]
@@ -16,7 +16,11 @@ pub enum AccountError {
 
     #[error("Username not found")]
     UsernameNotFound,
+
+    #[error("Bad password")]
+    BadPassword,
 }
+pub type AccountResult<T> = Result<T, AccountError>;
 
 #[derive(Debug)]
 pub struct Account {
