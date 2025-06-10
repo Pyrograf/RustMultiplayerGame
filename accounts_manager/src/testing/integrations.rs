@@ -144,7 +144,7 @@ mod tests {
             assert_eq!(response.accounts_count, 1); // Count remains the same
 
             assert!(matches!(deletion_error, AccountsManagerClientError::ApiError(ApiError::AccountError(AccountError::BadPassword))));
-            
+
         }).await;
     }
 
@@ -176,6 +176,34 @@ mod tests {
             assert_eq!(response.accounts_count, 1); // Count remains the same
 
             assert!(matches!(deletion_error, AccountsManagerClientError::ApiError(ApiError::AccountError(AccountError::UsernameNotFound))));
+
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn test_update_account_password_with_correct_old_password() {
+        tests_trace_setup();
+
+        setup_server_client_interaction(|client| async move {
+            let username = "User5";
+            let password_old = "Password1234%^&";
+            client.request_create_account(username.to_string(), password_old.to_string())
+                .await
+                .unwrap();
+            
+            // Change password with correct old password
+            let password_new = "Password1234%^&111111111";
+            client.request_update_account_password(username.to_string(), password_old.to_string(), password_new.to_string())
+                .await
+                .unwrap();
+
+            let password_old_incorrect = password_old;
+            
+            let update_password_error = client.request_update_account_password(username.to_string(), password_old_incorrect.to_string(), "sometingdontcare".to_string())
+                .await
+                .unwrap_err();
+            
+            assert!(matches!(update_password_error, AccountsManagerClientError::ApiError(ApiError::AccountError(AccountError::BadPassword))));
 
         }).await;
     }

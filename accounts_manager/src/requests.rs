@@ -12,8 +12,7 @@ pub struct DeleteAccountRequestBody {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ChangePasswordRequest {
-    pub username: String,
+pub struct UpdatePasswordRequest {
     pub password_old: String,
     pub password_new: String,
 }

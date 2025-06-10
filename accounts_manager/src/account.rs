@@ -22,7 +22,7 @@ pub enum AccountError {
 }
 pub type AccountResult<T> = Result<T, AccountError>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Account {
     pub username: String,
     hashed_password: String,
@@ -49,8 +49,8 @@ impl Borrow<str> for Account {
 }
 
 impl Account {
-    pub fn new(username: String, plaintext_password: &str) -> Result<Account, AccountError> {
-        let hashed_password = hash_password(plaintext_password)
+    pub fn new(username: String, password_plaintext: &str) -> AccountResult<Account> {
+        let hashed_password = hash_password(password_plaintext)
             .map_err(|e| AccountError::PasswordHashError(e.to_string()))?;
 
         Ok(Self {
@@ -59,9 +59,15 @@ impl Account {
         })
     }
 
-    pub fn verify(&self, password_plaintext: &str) -> Result<bool, AccountError> {
+    pub fn verify(&self, password_plaintext: &str) -> AccountResult<bool> {
         verify_password(&self.hashed_password, password_plaintext)
             .map_err(|e| AccountError::PasswordHashError(e.to_string()))
+    }
+
+    pub fn set_password(&mut self, password_plaintext: &str) -> AccountResult<()> {
+        self.hashed_password = hash_password(password_plaintext)
+            .map_err(|e| AccountError::PasswordHashError(e.to_string()))?;
+        Ok(())
     }
 }
 
@@ -100,6 +106,14 @@ impl AccountsManager {
             Err(AccountError::UsernameNotFound)
         }
     }
+
+    pub fn take_account(&mut self, username: &str) -> Option<Account> {
+        self.accounts.get(username).cloned().and_then(|account| {
+            self.accounts.remove(username);
+            Some(account)
+        })
+    }
+
     pub fn count(&self) -> usize {
         self.accounts.len()
     }
@@ -185,6 +199,28 @@ mod tests {
         let account = Account::new("User".to_string(), password_1).unwrap();
         let password_matches = account.verify(password_2).unwrap();
         assert!(!password_matches);
+    }
+
+    #[test]
+    fn test_set_account_password() {
+        let password_1 = "Password1";
+        let password_2 = "Password2";
+        let mut account = Account::new("User".to_string(), password_1).unwrap();
+
+        let password_matches = account.verify(password_1).unwrap();
+        assert!(password_matches);
+
+        let password_matches = account.verify(password_2).unwrap();
+        assert!(!password_matches);
+
+        // Set Password check again
+        account.set_password(password_2).unwrap();
+
+        let password_matches = account.verify(password_1).unwrap();
+        assert!(!password_matches);
+
+        let password_matches = account.verify(password_2).unwrap();
+        assert!(password_matches);
     }
 
     #[test]

@@ -6,7 +6,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use axum::routing::delete;
+use axum::routing::{delete, patch};
 use tokio::sync::Mutex;
 
 pub fn get_router(app_data: Arc<Mutex<AppData>>) -> Router {
@@ -18,6 +18,10 @@ pub fn get_router(app_data: Arc<Mutex<AppData>>) -> Router {
         .route(
             "/accounts/{username}",
             delete(delete_account)
+        )
+        .route(
+            "/accounts/{username}/password",
+            patch(update_account_password)
         )
         .with_state(app_data.clone());
 

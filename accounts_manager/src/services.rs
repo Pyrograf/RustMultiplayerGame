@@ -1,5 +1,21 @@
 use crate::account::{Account, AccountError, AccountResult, AccountsManager};
 
+fn verify_password(
+    username: &str,
+    password: &str,
+    accounts_manager: &AccountsManager
+) -> AccountResult<()> {
+    let account = accounts_manager
+        .find_account_by_username(&username)
+        .ok_or(AccountError::UsernameNotFound)?;
+    let password_matches = account.verify(&password)?;
+    if !password_matches {
+        return Err(AccountError::BadPassword);
+    } else {
+        Ok(())
+    }
+}
+
 pub fn create_account(
     username: String,
     password: String,
@@ -15,15 +31,28 @@ pub fn delete_account(
     password: String,
     accounts_manager: &mut AccountsManager,
 ) -> AccountResult<()> {
-    let account = accounts_manager
-        .find_account_by_username(&username)
-        .ok_or(AccountError::UsernameNotFound)?;
-    let password_matches = account.verify(&password)?;
-    if !password_matches {
-        return Err(AccountError::BadPassword);
-    }
-
+    verify_password(&username, &password, &accounts_manager)?;
     accounts_manager.remove_account(&username)?;
+    Ok(())
+}
+
+pub fn update_account_password(
+    username: String,
+    password_old: String,
+    password_new: String,
+    accounts_manager: &mut AccountsManager,
+) -> AccountResult<()> {
+    verify_password(&username, &password_old, &accounts_manager)?;
+
+    // Take account
+    let mut account = accounts_manager.take_account(&username)
+        .expect("Account should be found");
+
+    // Replace password
+    account.set_password(&password_new)?;
+
+    //Place account back
+    accounts_manager.add_account(account)?;
     Ok(())
 }
 
@@ -61,7 +90,7 @@ mod tests {
             &mut accounts_manager,
         )
         .unwrap_err();
-        
+
         assert!(
             matches!(err_user_alredy_exists, AccountError::UsernameAlreadyExists),
             "Err {:?}",
@@ -98,7 +127,7 @@ mod tests {
             &mut accounts_manager,
         )
         .unwrap_err();
-        
+
         assert!(
             matches!(err_user_not_found, AccountError::UsernameNotFound),
             "Err {:?}",

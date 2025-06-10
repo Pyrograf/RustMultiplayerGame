@@ -1,4 +1,4 @@
-use crate::requests::{CreateAccountRequest, DeleteAccountRequestBody};
+use crate::requests::{CreateAccountRequest, DeleteAccountRequestBody, UpdatePasswordRequest};
 use crate::responses::{AccountsServerStatus, ApiError};
 use reqwest::{Client as HttpClient, Response, StatusCode};
 use std::time::Duration;
@@ -76,6 +76,24 @@ impl AccountsManagerClient {
         let resp = self
             .http_client
             .delete(&url)
+            .json(&request_payload)
+            .send()
+            .await?;
+
+        Self::handle_account_manage_response(resp, StatusCode::OK).await
+    }
+
+    pub async fn request_update_account_password(
+        &self,
+        username: String,
+        password_old: String,
+        password_new: String,
+    ) -> AccountsManagerResult<()> {
+        let url = format!("{}/api/accounts/{}/password", self.base_url, username);
+        let request_payload = UpdatePasswordRequest { password_old, password_new };
+        let resp = self
+            .http_client
+            .patch(&url)
             .json(&request_payload)
             .send()
             .await?;
