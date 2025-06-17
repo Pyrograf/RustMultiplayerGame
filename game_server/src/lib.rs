@@ -1,8 +1,9 @@
 use crate::session::ConnectionSession;
 use std::io::ErrorKind;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tokio::net::TcpListener;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot, Notify};
 use tokio::task::JoinHandle;
 
 pub mod client;
@@ -26,6 +27,7 @@ pub struct GameServer {
     task_handle: JoinHandle<()>,
     local_address: SocketAddr,
     commands_tx: mpsc::Sender<ServerCommand>,
+    connection_notifications: Arc<Notify>,
 }
 
 #[derive(Debug)]
@@ -36,30 +38,52 @@ pub enum ServerCommand {
 
 impl GameServer {
     const COMMANDS_QUEUE_SIZE: usize = 32;
+    const SESSION_END_QUEUE_SIZE: usize = 16;
+
     pub async fn run() -> tokio::io::Result<Self> {
         let listener = TcpListener::bind("127.0.0.1:0").await?;
         let local_address = listener.local_addr()?;
         let (commands_tx, mut commands_rx) =
             mpsc::channel::<ServerCommand>(Self::COMMANDS_QUEUE_SIZE);
 
-        let mut next_connection_id = 0;
-        let mut connection_sessions: Vec<ConnectionSession> = Vec::new();
+        let connection_notifications =  Arc::new(Notify::new());
+        let connection_notifications_shared = connection_notifications.clone();
 
         let task_handle = tokio::task::spawn(async move {
+            let mut next_connection_id = 0;
+            let mut connection_sessions: Vec<ConnectionSession> = Vec::new();
+            let (session_end_tx, mut session_end_rx) = mpsc::channel(Self::SESSION_END_QUEUE_SIZE);
+            
             loop {
                 tokio::select! {
                     incomming_connection = listener.accept() => {
+                        connection_notifications_shared.notify_waiters();
+
                         if let Ok((stream, address)) = incomming_connection {
                             let new_connection_session = ConnectionSession::new(
                                 next_connection_id,
                                 stream,
-                                address
+                                address,
+                                session_end_tx.clone()
                             ).await;
 
                             connection_sessions.push(new_connection_session);
                             next_connection_id += 1;
                         } else {
                             tracing::warn!("connection immediately terminated");
+                        }
+                    },
+                    dced_session_id = session_end_rx.recv() => {
+                        // `None` will happen only if this task get dropped - dont care
+                        if let Some(dced_session_id) = dced_session_id {
+                            // Remove from stored session
+                            // TODO better approach & container
+                            match connection_sessions.iter().position(|conn| conn.get_id() == dced_session_id) {
+                                Some(session_index) => {
+                                    let _ = connection_sessions.remove(session_index);
+                                },
+                                None => { tracing::warn!("could not found disconnected session. Ignores");}
+                            }
                         }
                     },
                     cmd = commands_rx.recv() => {
@@ -84,6 +108,7 @@ impl GameServer {
             task_handle,
             local_address,
             commands_tx,
+            connection_notifications,
         })
     }
 
@@ -123,6 +148,26 @@ impl GameServer {
             .await
             .map_err(|e| std::io::Error::new(ErrorKind::Other, e.to_string()))?;
         Ok(commands_rx.await?)
+    }
+
+    pub async fn await_any_connection(&self) -> GameServerResult<usize> {
+        loop {
+            let count = self.get_connections_count().await?;
+            if count > 0 {
+                return Ok(count);
+            }
+            self.connection_notifications.notified().await;
+        }
+    }
+
+    pub async fn await_all_disconnect(&self) -> GameServerResult<()> {
+        loop {
+            let count = self.get_connections_count().await?;
+            if count == 0 {
+                return Ok(());
+            }
+            self.connection_notifications.notified().await;
+        }
     }
 }
 
