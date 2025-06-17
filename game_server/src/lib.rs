@@ -1,14 +1,143 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
+use crate::session::ConnectionSession;
+use std::io::ErrorKind;
+use std::net::SocketAddr;
+use tokio::net::TcpListener;
+use tokio::sync::{mpsc, oneshot};
+use tokio::task::JoinHandle;
+
+pub mod client;
+mod session;
+mod testing;
+
+#[derive(Debug, thiserror::Error)]
+pub enum GameServerError {
+    #[error(transparent)]
+    StdIoError(#[from] std::io::Error),
+
+    #[error(transparent)]
+    OneshotRecvError(#[from] tokio::sync::oneshot::error::RecvError),
+}
+
+pub type GameServerResult<T> = Result<T, GameServerError>;
+
+pub struct GameServer {
+    task_handle: JoinHandle<()>,
+    local_address: SocketAddr,
+    commands_tx: mpsc::Sender<ServerCommand>,
+}
+
+#[derive(Debug)]
+pub enum ServerCommand {
+    Shutdown,
+    CountConnections(oneshot::Sender<usize>),
+}
+
+impl GameServer {
+    const COMMANDS_QUEUE_SIZE: usize = 32;
+    pub async fn run() -> tokio::io::Result<Self> {
+        let listener = TcpListener::bind("127.0.0.1:0").await?;
+        let local_address = listener.local_addr()?;
+        let (commands_tx, mut commands_rx) =
+            mpsc::channel::<ServerCommand>(Self::COMMANDS_QUEUE_SIZE);
+
+        let mut next_connection_id = 0;
+        let mut connection_sessions: Vec<ConnectionSession> = Vec::new();
+
+        let task_handle = tokio::task::spawn(async move {
+            loop {
+                tokio::select! {
+                    incomming_connection = listener.accept() => {
+                        if let Ok((stream, address)) = incomming_connection {
+                            let new_connection_session = ConnectionSession::new(
+                                next_connection_id,
+                                stream,
+                                address
+                            ).await;
+
+                            connection_sessions.push(new_connection_session);
+                            next_connection_id += 1;
+                        } else {
+                            tracing::warn!("connection immediately terminated");
+                        }
+                    },
+                    cmd = commands_rx.recv() => {
+                        let cmd = cmd.unwrap_or(ServerCommand::Shutdown);
+                        tracing::debug!("Commands received '{cmd:?}'");
+                        match cmd {
+                            ServerCommand::Shutdown => {
+                                break;
+                            },
+                            ServerCommand::CountConnections(sender) => {
+                                if let Err(_) = sender.send(connection_sessions.len()) {
+                                    tracing::error!("Receiver closed before getting response");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        Ok(Self {
+            task_handle,
+            local_address,
+            commands_tx,
+        })
+    }
+
+    pub async fn shutdown_gracefully(self) -> std::io::Result<()> {
+        tracing::info!("Gracefully shutting down...");
+        if self
+            .commands_tx
+            .send(ServerCommand::Shutdown)
+            .await
+            .is_err()
+        {
+            let err_msg = "Could not sent shutdown signal";
+            tracing::warn!(err_msg);
+            return Err(std::io::Error::new(ErrorKind::Other, err_msg));
+        }
+
+        let _ = self.task_handle.await?;
+        tracing::info!("Server got shutdown!");
+        Ok(())
+    }
+
+    pub async fn await_shutdown(self) -> std::io::Result<()> {
+        let _ = self.task_handle.await?;
+        tracing::info!("Server got shutdown!");
+        Ok(())
+    }
+
+    pub fn get_address(&self) -> &SocketAddr {
+        &self.local_address
+    }
+
+    pub async fn get_connections_count(&self) -> GameServerResult<usize> {
+        let (commands_tx, mut commands_rx) = oneshot::channel::<usize>();
+        let cmd = ServerCommand::CountConnections(commands_tx);
+        self.commands_tx
+            .send(cmd)
+            .await
+            .map_err(|e| std::io::Error::new(ErrorKind::Other, e.to_string()))?;
+        Ok(commands_rx.await?)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing::tests_trace_setup;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+    #[tokio::test]
+    async fn test_starting_shutting_server() {
+        tests_trace_setup();
+
+        let server = crate::GameServer::run().await.unwrap();
+        let server_address = server.get_address();
+        tracing::debug!("server address: {}", server_address);
+        let connections_count =  server.get_connections_count().await.unwrap();
+        assert_eq!(connections_count, 0);
+        server.shutdown_gracefully().await.unwrap();
     }
 }

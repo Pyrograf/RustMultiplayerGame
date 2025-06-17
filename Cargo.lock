@@ -769,6 +769,15 @@ dependencies = [
 [[package]]
 name = "integration_tests"
 version = "0.1.0"
+dependencies = [
+ "ctrlc",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "ipnet"
