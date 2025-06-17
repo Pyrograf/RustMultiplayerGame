@@ -6,7 +6,9 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 
 pub mod client;
-mod session;
+pub mod session;
+pub mod requests;
+pub mod responses;
 mod testing;
 
 #[derive(Debug, thiserror::Error)]
