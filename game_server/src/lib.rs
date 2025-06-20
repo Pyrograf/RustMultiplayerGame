@@ -19,6 +19,9 @@ pub enum GameServerError {
 
     #[error(transparent)]
     OneshotRecvError(#[from] tokio::sync::oneshot::error::RecvError),
+
+    #[error(transparent)]
+    SerdeJsonError(#[from] serde_json::Error),
 }
 
 pub type GameServerResult<T> = Result<T, GameServerError>;
@@ -156,7 +159,11 @@ impl GameServer {
             if count > 0 {
                 return Ok(count);
             }
-            self.connection_notifications.notified().await;
+
+            tokio::select! {
+                _ = self.connection_notifications.notified() => {},
+                _ = tokio::time::sleep(std::time::Duration::from_millis(500)) => {}
+            }
         }
     }
 
@@ -166,7 +173,11 @@ impl GameServer {
             if count == 0 {
                 return Ok(());
             }
-            self.connection_notifications.notified().await;
+
+            tokio::select! {
+                _ = self.connection_notifications.notified() => {},
+                _ = tokio::time::sleep(std::time::Duration::from_millis(500)) => {}
+            }
         }
     }
 }

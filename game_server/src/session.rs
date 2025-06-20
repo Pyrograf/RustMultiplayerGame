@@ -4,6 +4,9 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
+use crate::{GameServerError, GameServerResult};
+use crate::requests::GameServerRequest;
+use crate::responses::GameServerResponse;
 
 #[derive(Debug)]
 pub struct ConnectionSession {
@@ -23,14 +26,20 @@ impl ConnectionSession {
                 // tokio::time::sleep(Duration::from_millis(100)).await;
                 match stream.read_u32_le().await {
                     Ok(request_length) => {
-                        let mut buffer = vec![0u8; request_length as usize];
-                        stream.read_exact(&mut buffer).await.unwrap();
+                        let mut request_buffer = vec![0u8; request_length as usize];
+                        stream.read_exact(&mut request_buffer).await.unwrap();
 
-                        stream.write_u32_le(2).await.unwrap();
-                        stream.write_all("1234".as_bytes()).await.unwrap();
+                        match Self::process_request_into_response(request_buffer) {
+                            Ok(response_bytes) => {
+                                let response_bytes_count = response_bytes.len() as u32;
+                                stream.write_u32_le(response_bytes_count).await.unwrap();
+                                stream.write_all(response_bytes.as_slice()).await.unwrap();
+                            },
+                            Err(e) => {
+                                tracing::error!("Could not response, reason: '{e}'");
+                            }
+                        }
 
-                        // TODO process requests
-                        // unimplemented!("TODO")
                     },
                     Err(_) => {
                         if disconnect_tx.send(connection_id).await.is_err() {
@@ -43,6 +52,27 @@ impl ConnectionSession {
         });
 
         Self { connection_id, address, session_task }
+    }
+
+    fn process_request_into_response(response_buffer: Vec<u8>) -> GameServerResult<Vec<u8>> {
+        let request: GameServerRequest = serde_json::from_slice(&response_buffer)
+            .inspect_err(|e| tracing::error!("Error deserializing request: '{e}'"))?;
+
+        let response = match request {
+            GameServerRequest::Status => Self::handle_request_status()
+        };
+
+        let result_bytes = serde_json::to_vec(&response).inspect_err(|err| {
+            tracing::error!("Error serializing request {request:?}. {:?}", err)
+        }).inspect_err(|e| tracing::error!("Error serializing response: '{e}'"))?;
+
+        Ok(result_bytes)
+    }
+
+    fn handle_request_status()  -> GameServerResponse {
+        GameServerResponse::Status {
+            info: "Hello from session".to_string()
+        }
     }
 
     pub fn get_id(&self) -> ConnectionSessionId { self.connection_id }

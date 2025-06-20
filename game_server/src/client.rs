@@ -100,10 +100,15 @@ impl GameClient {
         stream.write_all(request_bytes.as_slice()).await?;
 
         let response_length = stream.read_u32_le().await?;
+        tracing::info!("Client sent request, awaiting response size: {response_length}...");
         let mut response_buff = vec![0u8; response_length as usize];
-        stream.read_exact(&mut response_buff).await?;
+        stream.read_exact(&mut response_buff).await.inspect_err(|e| {
+            tracing::error!("Error reading from response stream: '{e:?}' exact size: {response_length}")
+        })?;
 
-        Ok(serde_json::from_slice(&response_buff)?)
+        Ok(serde_json::from_slice(&response_buff)
+            .inspect_err(|e| tracing::error!("Error deserializing response: '{e}'"))?
+        )
     }
 
     pub async fn make_request(

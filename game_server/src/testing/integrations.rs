@@ -67,15 +67,15 @@ mod tests {
         tests_trace_setup();
 
         run_single_client_test(|client| async move {
-            tracing::error!("X");
+            tracing::info!("X");
             let response = client.make_request(GameServerRequest::Status).await.unwrap();
             match response {
-                GameServerResponse::Status { info } => { tracing::error!("Got status response: {}", info); }
+                GameServerResponse::Status { info } => { tracing::info!("Got status response: {}", info); }
             }
 
-            tracing::error!("Y");
+            tracing::info!("Y");
             tokio::time::sleep(Duration::from_millis(100)).await;
-            tracing::error!("Z");
+            tracing::info!("Z");
         });
     }
 }
