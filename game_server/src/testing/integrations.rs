@@ -18,30 +18,22 @@ where
         let client_offloaded_task = tokio::task::spawn(async move {
             // Delay to enforce order, funky client connection can be faster
             // than polling for connections count
-            tracing::info!("A");
             tokio::time::sleep(Duration::from_millis(100)).await;
 
-            tracing::info!("B");
             let client = GameClient::connect(server_address).await.unwrap();
 
-            tracing::info!("C");
             tracing::info!("Starting client-server test space");
             test_fn(client).await;
-            tracing::info!("D");
         });
 
-        tracing::info!("1");
         let connections_count = server.await_any_connection().await.unwrap();
         assert_eq!(connections_count, 1, "Client not connected");
 
-        tracing::info!("2");
         client_offloaded_task.await.unwrap();
 
-        tracing::info!("3");
         server.await_all_disconnect().await.unwrap();
         assert_eq!(server.get_connections_count().await.unwrap(), 0, "Client not disconnected");
 
-        tracing::info!("4");
         server.shutdown_gracefully().await.unwrap();
     });
 }
@@ -67,15 +59,28 @@ mod tests {
         tests_trace_setup();
 
         run_single_client_test(|client| async move {
-            tracing::info!("X");
             let response = client.make_request(GameServerRequest::Status).await.unwrap();
             match response {
-                GameServerResponse::Status { info } => { tracing::info!("Got status response: {}", info); }
+                GameServerResponse::Status { info } => { tracing::info!("Got status response: {}", info); },
+                _ => panic!("Got unexpected response: {response:?}"),
             }
 
-            tracing::info!("Y");
             tokio::time::sleep(Duration::from_millis(100)).await;
-            tracing::info!("Z");
+        });
+    }
+
+    #[test]
+    fn test_client_getting_entities_count() {
+        tests_trace_setup();
+
+        run_single_client_test(|client| async move {
+            let response = client.make_request(GameServerRequest::EntitiesCount).await.unwrap();
+            match response {
+                GameServerResponse::EntitiesCount { count } => { assert_eq!(count, 0, "Count not zero") ; },
+                _ => panic!("Got unexpected response: {response:?}"),
+            }
+
+            tokio::time::sleep(Duration::from_millis(100)).await;
         });
     }
 }

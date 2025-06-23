@@ -5,12 +5,14 @@ use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::{mpsc, oneshot, Notify};
 use tokio::task::JoinHandle;
+use crate::game::Game;
 
 pub mod client;
 pub mod session;
 pub mod requests;
 pub mod responses;
 mod testing;
+mod game;
 
 #[derive(Debug, thiserror::Error)]
 pub enum GameServerError {
@@ -56,6 +58,7 @@ impl GameServer {
             let mut next_connection_id = 0;
             let mut connection_sessions: Vec<ConnectionSession> = Vec::new();
             let (session_end_tx, mut session_end_rx) = mpsc::channel(Self::SESSION_END_QUEUE_SIZE);
+            let game = Arc::new(Game::new().await);
             
             loop {
                 tokio::select! {
@@ -67,7 +70,8 @@ impl GameServer {
                                 next_connection_id,
                                 stream,
                                 address,
-                                session_end_tx.clone()
+                                session_end_tx.clone(),
+                                game.clone()
                             ).await;
 
                             connection_sessions.push(new_connection_session);

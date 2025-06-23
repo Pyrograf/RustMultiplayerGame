@@ -5,4 +5,7 @@ pub enum GameServerResponse {
     Status {
         info: String,
     },
+    EntitiesCount {
+        count: usize
+    }
 }
