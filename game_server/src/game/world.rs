@@ -1,8 +1,8 @@
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
-use crate::game::entity::Entity;
-use crate::GameServer;
+use crate::game::entity::EntityId;
+use crate::game::system::{MovementSystem, PositionSystem};
 
 #[derive(Debug, thiserror::Error)]
 pub enum WorldError {
@@ -16,6 +16,8 @@ pub enum WorldError {
 pub type WorldResult<T> =  Result<T, WorldError>;
 
 const TICK_DURATION_MS: u64 = 32;
+const TICK_DT_SEC: f32 = TICK_DURATION_MS as f32 / 1000.0;
+
 const DEFAULT_CMD_TIMEOUT_MS: u64 = 1000;
 
 pub enum WorldManagerCmd {
@@ -46,12 +48,13 @@ impl WorldManager {
             loop {
                 tokio::select! {
                     _ = ticker.tick() => {
-                        world.tick().await;
+                        world.tick(TICK_DT_SEC);
                     },
                     cmd_wrapped = rx.recv() => match cmd_wrapped {
                         Some(cmd_wrapped) => {
                             let cmd_response = match cmd_wrapped.cmd {
                                 WorldManagerCmd::GetEntitiesCount => WorldManagerCmdResult::EntitiesCount(world.entities.len()),
+                                // WorldManagerCmd::GetEntitiesCount => WorldManagerCmdResult::EntitiesCount(0),
                             };
                             if cmd_wrapped.response.send(cmd_response).is_err() {
                                 tracing::warn!("Cmd response dropped")
@@ -92,18 +95,22 @@ impl WorldManager {
 
 
 pub struct World {
-    entities: Vec<Entity>
+    entities: Vec<EntityId>,
+    position_system: PositionSystem,
+    movement_system: MovementSystem,
 }
 
 impl World {
     pub fn new() -> Self {
         Self {
-            entities: vec![]
+            entities: vec![],
+            position_system: PositionSystem::new(),
+            movement_system: MovementSystem::new(),
         }
     }
 
-    pub async fn tick(&mut self) {
-
+    pub fn tick(&mut self, dt: f32) {
+        self.movement_system.tick(&mut self.position_system, dt);
     }
 }
 
