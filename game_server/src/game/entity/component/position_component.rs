@@ -6,6 +6,7 @@ use crate::game::entity::component::Component;
 use crate::game::math::Vec2F;
 use crate::game::world::World;
 
+#[derive(Debug)]
 pub struct PositionComponent {
     entity_id: EntityId,
     position: Vec2F,

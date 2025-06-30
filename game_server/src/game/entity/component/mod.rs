@@ -13,5 +13,6 @@ pub trait Component {
 
     fn as_mut_any(&mut self) -> &mut dyn Any;
 
+    /// Force attaching to Entity
     fn get_entity_id(&self) -> EntityId;
 }
