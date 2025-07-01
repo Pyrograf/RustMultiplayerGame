@@ -1,5 +1,5 @@
 use crate::requests::GameServerRequest;
-use crate::responses::GameServerResponse;
+use crate::responses::{GameServerResponse, ResponseResult};
 use std::fmt::Debug;
 use std::io::ErrorKind;
 use std::time::Duration;
@@ -7,6 +7,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
+use crate::game::character::CharacterId;
 
 #[derive(Debug, thiserror::Error)]
 pub enum GameClientError {
@@ -18,6 +19,12 @@ pub enum GameClientError {
 
     #[error(transparent)]
     SerdeJsonError(#[from] serde_json::Error),
+
+    #[error("Bad response")]
+    BadResponse,
+
+    #[error("Other '{0}'")]
+    Other(String),
 }
 
 pub type GameClientResult<T> = Result<T, GameClientError>;
@@ -121,6 +128,33 @@ impl GameClient {
             .await
             .map_err(|e| std::io::Error::new(ErrorKind::Other, e.to_string()))?;
         Ok(response_rx.await?)
+    }
+
+    pub async fn attach_to_character(&self, character_id: CharacterId) -> GameClientResult<()> {
+        let response = self.make_request(GameServerRequest::AttachToCharacter { character_id }).await?;
+        match response {
+            GameServerResponse::AttachToCharacter { result } => match result {
+                ResponseResult::Success => Ok(()),
+                ResponseResult::Error { message } =>  Err(GameClientError::Other(message)),
+            },
+            _ => Err(GameClientError::BadResponse)
+        }
+    }
+
+    pub async fn get_entities_count(&self) -> GameClientResult<usize> {
+        let response = self.make_request(GameServerRequest::EntitiesCount).await?;
+        match response {
+            GameServerResponse::EntitiesCount { count } => Ok(count),
+            _ => Err(GameClientError::BadResponse)
+        }
+    }
+
+    pub async fn get_status(&self) -> GameClientResult<String> {
+        let response = self.make_request(GameServerRequest::Status).await?;
+        match response {
+            GameServerResponse::Status { info } => Ok(info),
+            _ => Err(GameClientError::BadResponse)
+        }
     }
 
     pub async fn disconnect_await_finished(self) {
