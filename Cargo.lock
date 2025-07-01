@@ -273,6 +273,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "database_adapter"
+version = "0.1.0"
+dependencies = [
+ "argon2",
+ "base64ct",
+ "rand_core",
+ "serde",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = [ "game_client", "game_server", "accounts_manager"]
+members = [ "game_client", "game_server", "accounts_manager", "database_adapter"]
 
 [workspace.dependencies]
 tokio = { version = "1.45.1", features = ["full"]}
