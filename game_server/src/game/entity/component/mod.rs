@@ -1,8 +1,10 @@
 pub mod movement_component;
 pub mod position_component;
+pub mod name_component;
 
 pub use movement_component::MovementComponent;
 pub use position_component::PositionComponent;
+pub use name_component::NameComponent;
 
 use std::any::Any;
 use crate::game::entity::EntityId;

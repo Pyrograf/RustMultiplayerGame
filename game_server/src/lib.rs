@@ -2,6 +2,7 @@ use crate::session::ConnectionSession;
 use std::io::ErrorKind;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::sync::{mpsc, oneshot, Notify};
 use tokio::task::JoinHandle;
@@ -54,11 +55,16 @@ impl GameServer {
         let connection_notifications =  Arc::new(Notify::new());
         let connection_notifications_shared = connection_notifications.clone();
 
+        // Used to await task ready to accept connections
+        let (task_ready_tx, task_ready_rx) = tokio::sync::oneshot::channel::<()>();
+
         let task_handle = tokio::task::spawn(async move {
             let mut next_connection_id = 0;
             let mut connection_sessions: Vec<ConnectionSession> = Vec::new();
             let (session_end_tx, mut session_end_rx) = mpsc::channel(Self::SESSION_END_QUEUE_SIZE);
             let game = Arc::new(Game::new().await);
+
+            let _ = task_ready_tx.send(()).is_ok();
             
             loop {
                 tokio::select! {
@@ -111,6 +117,9 @@ impl GameServer {
             }
         });
 
+        let _ = task_ready_rx.await.is_ok();
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
         Ok(Self {
             task_handle,
             local_address,
@@ -158,6 +167,7 @@ impl GameServer {
     }
 
     pub async fn await_any_connection(&self) -> GameServerResult<usize> {
+        // FIXME: Not really useful can miss event
         loop {
             let count = self.get_connections_count().await?;
             if count > 0 {

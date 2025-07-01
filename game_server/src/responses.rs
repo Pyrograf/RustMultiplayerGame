@@ -1,4 +1,13 @@
 use serde::{Deserialize, Serialize};
+use crate::game::entity::EntityId;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum ResponseResult {
+    Success,
+    Error {
+        message: String,
+    },
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum GameServerResponse {
@@ -7,5 +16,8 @@ pub enum GameServerResponse {
     },
     EntitiesCount {
         count: usize
-    }
+    },
+    AttachToCharacter {
+        result: ResponseResult,
+    },
 }

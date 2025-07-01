@@ -1,8 +1,10 @@
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
+use crate::game::character::CharacterData;
+use crate::game::entity::component::{MovementComponent, NameComponent, PositionComponent};
 use crate::game::entity::EntityId;
-use crate::game::system::{MovementSystem, PositionSystem};
+use crate::game::system::{MovementSystem, NameSystem, PositionSystem};
 
 #[derive(Debug, thiserror::Error)]
 pub enum WorldError {
@@ -21,7 +23,10 @@ const TICK_DT_SEC: f32 = TICK_DURATION_MS as f32 / 1000.0;
 const DEFAULT_CMD_TIMEOUT_MS: u64 = 1000;
 
 pub enum WorldManagerCmd {
-    GetEntitiesCount
+    GetEntitiesCount,
+    SpawnCharacter {
+        character_data: CharacterData,
+    }
 }
 
 pub struct WorldManagerCmdWrapped {
@@ -30,6 +35,7 @@ pub struct WorldManagerCmdWrapped {
 }
 pub enum WorldManagerCmdResult {
     EntitiesCount(usize),
+    SpawnCharacter(EntityId),
 }
 pub struct WorldManager {
     handle: JoinHandle<()>,
@@ -54,7 +60,16 @@ impl WorldManager {
                         Some(cmd_wrapped) => {
                             let cmd_response = match cmd_wrapped.cmd {
                                 WorldManagerCmd::GetEntitiesCount => WorldManagerCmdResult::EntitiesCount(world.entities.len()),
-                                // WorldManagerCmd::GetEntitiesCount => WorldManagerCmdResult::EntitiesCount(0),
+                                WorldManagerCmd::SpawnCharacter { character_data } => {
+                                    let entity_id = world.generate_new_entity();
+                                    
+                                    // Safe unwraps - newly created entity
+                                    world.position_system.add_component(entity_id, PositionComponent::new(entity_id, character_data.position)).unwrap();
+                                    world.movement_system.add_component(entity_id, MovementComponent::new(entity_id, character_data.speed)).unwrap();
+                                    world.name_system.add_component(entity_id, NameComponent::new(entity_id, character_data.name)).unwrap();
+                                    
+                                    WorldManagerCmdResult::SpawnCharacter(entity_id)
+                                }
                             };
                             if cmd_wrapped.response.send(cmd_response).is_err() {
                                 tracing::warn!("Cmd response dropped")
@@ -91,26 +106,45 @@ impl WorldManager {
             _ => 0,
         }
     }
+
+    pub async fn spawn_character_entity(&self, character_data: CharacterData) -> WorldResult<EntityId> {
+        match self.request_cmd_with_default_timeout(WorldManagerCmd::SpawnCharacter { character_data }).await {
+            Ok(WorldManagerCmdResult::SpawnCharacter(entity_id)) => Ok(entity_id),
+            Err(err) => Err(err),
+            Ok(_) => panic!("Failed to spawn character entity - bad WorldManagerCmdResult"),
+        }
+    }
 }
 
 
 pub struct World {
     entities: Vec<EntityId>,
+    next_entity_id: EntityId,
     position_system: PositionSystem,
     movement_system: MovementSystem,
+    name_system: NameSystem,
 }
 
 impl World {
     pub fn new() -> Self {
         Self {
             entities: vec![],
+            next_entity_id: 0,
             position_system: PositionSystem::new(),
             movement_system: MovementSystem::new(),
+            name_system: NameSystem::new(),
         }
     }
 
     pub fn tick(&mut self, dt: f32) {
         self.movement_system.tick(&mut self.position_system, dt);
+    }
+
+    pub fn generate_new_entity(&mut self) -> EntityId {
+        let entity_id = self.next_entity_id;
+        self.next_entity_id += 1;
+        self.entities.push(entity_id);
+        entity_id
     }
 }
 

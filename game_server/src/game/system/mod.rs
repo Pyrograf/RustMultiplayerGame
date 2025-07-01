@@ -1,8 +1,10 @@
 pub mod movement_system;
 pub mod position_system;
+pub mod name_system;
 
 pub use position_system::PositionSystem;
 pub use movement_system::MovementSystem;
+pub use name_system::NameSystem;
 
 #[cfg(test)]
 mod tests {
