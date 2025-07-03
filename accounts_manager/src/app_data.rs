@@ -1,15 +1,22 @@
 use std::collections::HashSet;
-use crate::account::{Account, AccountsManager};
+use std::fmt::{Debug, Formatter};
+use std::sync::Arc;
+use database_adapter::DatabaseAdapter;
 
-#[derive(Debug)]
 pub struct AppData {
-    pub accounts_manager: AccountsManager,
+    pub database_adapter: Arc<dyn DatabaseAdapter>,
 }
 
-impl Default for AppData {
-    fn default() -> Self {
+impl AppData {
+    pub fn new(database_adapter: Arc<dyn DatabaseAdapter>) -> Self {
         Self {
-            accounts_manager:  AccountsManager::new(),
+            database_adapter,
         }
+    }
+}
+
+impl Debug for AppData {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "AppData")
     }
 }

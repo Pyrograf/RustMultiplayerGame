@@ -1,11 +1,13 @@
 use crate::{AccountData, DatabaseAdapter, DatabaseAdapterError, DatabaseAdapterResult};
 use std::collections::HashSet;
+use async_trait::async_trait;
 use tokio::sync::Mutex;
 
 pub struct DatabaseTestAdapter {
     accounts: Mutex<HashSet<AccountData>>,
 }
 
+#[async_trait]
 impl DatabaseAdapter for DatabaseTestAdapter {
     async fn get_accounts(&self) -> DatabaseAdapterResult<Vec<AccountData>> {
         Ok(self.accounts.lock().await.iter().cloned().collect())
@@ -80,7 +82,7 @@ impl DatabaseAdapter for DatabaseTestAdapter {
 }
 
 impl DatabaseTestAdapter {
-    async fn new() -> Self {
+    pub async fn new() -> Self {
         DatabaseTestAdapter {
             accounts: Mutex::new(HashSet::new()),
         }

@@ -15,3 +15,4 @@ serde = { version = "1.0.219", features = ["derive"] }
 argon2 = { version = "0.5.3", features = ["alloc", "password-hash", "rand"] }
 base64ct = { version = "=1.7.3"}
 rand_core = { version = "=0.6.4" , features = ["getrandom"]}
+async-trait = { workspace = true }

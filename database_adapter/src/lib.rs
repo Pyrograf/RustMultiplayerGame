@@ -1,7 +1,7 @@
 pub mod account;
 pub mod test;
 
-use std::future::Future;
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 pub use account::AccountData;
 
@@ -22,18 +22,19 @@ pub enum DatabaseAdapterError {
 
 pub type  DatabaseAdapterResult<T> = Result<T, DatabaseAdapterError>;
 
-pub trait DatabaseAdapter {
-    fn get_accounts(&self) -> impl Future<Output = DatabaseAdapterResult<Vec<AccountData>>>;
+#[async_trait]
+pub trait DatabaseAdapter: Send + Sync {
+    async fn get_accounts(&self) -> DatabaseAdapterResult<Vec<AccountData>>;
 
-    fn get_account_by_name(&self, username: &str) -> impl Future<Output = DatabaseAdapterResult<AccountData>>;
+    async fn get_account_by_name(&self, username: &str) -> DatabaseAdapterResult<AccountData>;
 
-    fn add_account(&self, new_account: AccountData) -> impl Future<Output = DatabaseAdapterResult<()>>;
+    async fn add_account(&self, new_account: AccountData) -> DatabaseAdapterResult<()>;
 
-    fn remove_account_with_username(&self, username: &str) -> impl Future<Output = DatabaseAdapterResult<()>>;
+    async fn remove_account_with_username(&self, username: &str) -> DatabaseAdapterResult<()>;
 
-    fn is_password_matching(&self, username: &str, password_plaintext: &str) -> impl Future<Output = DatabaseAdapterResult<bool>>;
+    async fn is_password_matching(&self, username: &str, password_plaintext: &str) -> DatabaseAdapterResult<bool>;
 
-    fn change_password(&self, username: &str, old_password_plaintext: &str, new_password_plaintext: &str) -> impl Future<Output = DatabaseAdapterResult<()>>;
+    async fn change_password(&self, username: &str, old_password_plaintext: &str, new_password_plaintext: &str) -> DatabaseAdapterResult<()>;
 
-    fn get_accounts_count(&self) -> impl Future<Output = DatabaseAdapterResult<usize>>;
+    async fn get_accounts_count(&self) -> DatabaseAdapterResult<usize>;
 }

@@ -4,14 +4,17 @@ mod tests {
     use crate::testing::tests_trace_setup;
     use crate::AccountsManagerServer;
     use std::future::Future;
-    use crate::account::AccountError;
+    use std::sync::Arc;
+    use database_adapter::DatabaseAdapterError;
+    use database_adapter::test::DatabaseTestAdapter;
     use crate::responses::ApiError;
 
     #[tokio::test]
     async fn test_client_connecting_to_server() {
         tests_trace_setup();
+        let database_adapter = Arc::new(DatabaseTestAdapter::new().await);
 
-        let server = AccountsManagerServer::run().await.unwrap();
+        let server = AccountsManagerServer::run(database_adapter).await.unwrap();
         let server_address = server.get_address().to_string();
         let client = AccountsManagerClient::new(&server_address).unwrap();
         let response = client.get_server_status().await.unwrap();
@@ -23,7 +26,8 @@ mod tests {
         P: FnOnce(AccountsManagerClient) -> Fut,
         Fut: Future<Output = ()>,
     {
-        let server = AccountsManagerServer::run().await.unwrap();
+        let database_adapter = Arc::new(DatabaseTestAdapter::new().await);
+        let server = AccountsManagerServer::run(database_adapter).await.unwrap();
         let server_address = server.get_address().to_string();
         let client = AccountsManagerClient::new(&server_address).unwrap();
         procedure(client).await
@@ -73,9 +77,9 @@ mod tests {
 
             match response {
                 AccountsManagerClientError::ApiError(api_err) => match api_err {
-                    ApiError::AccountError(acc_err) => match acc_err {
-                        AccountError::UsernameAlreadyExists =>  (),
-                        err => panic!("Unexpected error: {:?} should give 'AccountError::UsernameAlreadyExists'", err),
+                    ApiError::DatabaseAdapterError(acc_err) => match acc_err {
+                        DatabaseAdapterError::UsernameAlreadyExists =>  (),
+                        err => panic!("Unexpected error: {:?} should give 'DatabaseAdapterError::UsernameAlreadyExists'", err),
                     }
                 },
                 _ => panic!("Should give response 'ApiError', got instead {response:?}"),
@@ -143,7 +147,7 @@ mod tests {
             let response = client.get_server_status().await.unwrap();
             assert_eq!(response.accounts_count, 1); // Count remains the same
 
-            assert!(matches!(deletion_error, AccountsManagerClientError::ApiError(ApiError::AccountError(AccountError::BadPassword))));
+            assert!(matches!(deletion_error, AccountsManagerClientError::ApiError(ApiError::DatabaseAdapterError(DatabaseAdapterError::BadPassword))));
 
         }).await;
     }
@@ -175,7 +179,7 @@ mod tests {
             let response = client.get_server_status().await.unwrap();
             assert_eq!(response.accounts_count, 1); // Count remains the same
 
-            assert!(matches!(deletion_error, AccountsManagerClientError::ApiError(ApiError::AccountError(AccountError::UsernameNotFound))));
+            assert!(matches!(deletion_error, AccountsManagerClientError::ApiError(ApiError::DatabaseAdapterError(DatabaseAdapterError::UsernameNotFound))));
 
         }).await;
     }
@@ -203,7 +207,7 @@ mod tests {
                 .await
                 .unwrap_err();
             
-            assert!(matches!(update_password_error, AccountsManagerClientError::ApiError(ApiError::AccountError(AccountError::BadPassword))));
+            assert!(matches!(update_password_error, AccountsManagerClientError::ApiError(ApiError::DatabaseAdapterError(DatabaseAdapterError::BadPassword))));
 
         }).await;
     }

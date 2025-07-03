@@ -8,6 +8,7 @@ use tower_http::trace::{
     DefaultOnResponse,
     TraceLayer
 };
+use database_adapter::DatabaseAdapter;
 
 pub mod router;
 pub mod app_data;
@@ -15,7 +16,6 @@ pub mod handlers;
 pub mod client;
 pub mod requests;
 pub mod responses;
-pub mod account;
 pub mod services;
 mod testing;
 
@@ -28,9 +28,9 @@ pub struct AccountsManagerServer {
 }
 
 impl AccountsManagerServer {
-    pub async fn run() -> tokio::io::Result<Self> {
+    pub async fn run(database_adapter: Arc<dyn DatabaseAdapter>) -> tokio::io::Result<Self> {
 
-        let app_data = Arc::new(Mutex::new(AppData::default()));
+        let app_data = Arc::new(Mutex::new(AppData::new(database_adapter)));
 
         let app = router::get_router(app_data.clone())
             .layer(TraceLayer::new_for_http()
@@ -106,6 +106,7 @@ impl AccountsManagerServer {
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
+    use database_adapter::test::DatabaseTestAdapter;
     use crate::testing::tests_trace_setup;
     use super::*;
 
@@ -114,7 +115,8 @@ mod tests {
         tests_trace_setup();
 
         {
-            let server = AccountsManagerServer::run().await.unwrap();
+            let db = DatabaseTestAdapter::new().await;
+            let server = AccountsManagerServer::run(Arc::new(db)).await.unwrap();
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
         tokio::time::sleep(Duration::from_millis(50)).await;
@@ -124,7 +126,8 @@ mod tests {
     async fn test_running_graceful_shutdown() {
         tests_trace_setup();
 
-        let server = AccountsManagerServer::run().await.unwrap();
+        let db = DatabaseTestAdapter::new().await;
+        let server = AccountsManagerServer::run(Arc::new(db)).await.unwrap();
         tokio::time::sleep(Duration::from_millis(100)).await;
         server.shutdown_gracefully_await().await.unwrap();
     }

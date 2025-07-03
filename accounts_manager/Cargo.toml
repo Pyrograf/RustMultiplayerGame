@@ -21,3 +21,6 @@ serde_json = { workspace = true }
 argon2 = { version = "0.5.3", features = ["alloc", "password-hash", "rand"] }
 base64ct = { version = "=1.7.3"}
 rand_core = { version = "=0.6.4" , features = ["getrandom"]}
+
+database_adapter = { version = "*", path = "../database_adapter"}
+async-trait = { workspace = true }

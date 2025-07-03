@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use database_adapter::test::DatabaseTestAdapter;
 use user_management::AccountsManagerServer;
 
 #[tokio::main]
@@ -11,7 +12,8 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let server = AccountsManagerServer::run().await.unwrap();
+    let database_adapter = Arc::new(DatabaseTestAdapter::new().await); // TODO use proper DB
+    let server = AccountsManagerServer::run(database_adapter).await.unwrap();
 
     let ctrlc_notify = Arc::new(tokio::sync::Notify::new());
     let ctrlc_notify_shared = ctrlc_notify.clone();
