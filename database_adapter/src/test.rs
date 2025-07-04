@@ -2,9 +2,11 @@ use crate::{AccountData, DatabaseAdapter, DatabaseAdapterError, DatabaseAdapterR
 use std::collections::HashSet;
 use async_trait::async_trait;
 use tokio::sync::Mutex;
+use crate::character::{CharacterData, CharacterId};
 
 pub struct DatabaseTestAdapter {
     accounts: Mutex<HashSet<AccountData>>,
+    characters: Mutex<HashSet<CharacterData>>,
 }
 
 #[async_trait]
@@ -15,8 +17,7 @@ impl DatabaseAdapter for DatabaseTestAdapter {
 
     async fn get_account_by_name(&self, username: &str) -> DatabaseAdapterResult<AccountData> {
         self.accounts
-            .lock()
-            .await
+            .lock().await
             .iter()
             .find(|data| data.username.as_str() == username)
             .map_or(Err(DatabaseAdapterError::UsernameNotFound), |data| {
@@ -79,12 +80,63 @@ impl DatabaseAdapter for DatabaseTestAdapter {
     async fn get_accounts_count(&self) -> DatabaseAdapterResult<usize> {
         Ok(self.accounts.lock().await.len())
     }
+
+    async fn get_characters(&self) -> DatabaseAdapterResult<Vec<CharacterData>> {
+        Ok(
+            self.characters.lock().await
+                .iter()
+                .cloned()
+                .collect()
+        )
+    }
+
+    async fn get_character_by_id(&self, character_id: CharacterId) -> DatabaseAdapterResult<CharacterData> {
+        self.characters
+            .lock().await
+            .get(&character_id)
+            .map_or(Err(DatabaseAdapterError::CharacterIdNotFound), |data| {
+                Ok(data.clone())
+            })
+    }
+
+
+
+    async fn add_character(&self, new_character: CharacterData) -> DatabaseAdapterResult<()> {
+        let mut guard = self.characters.lock().await;
+        if guard.insert(new_character) {
+            Ok(())
+        } else {
+            Err(DatabaseAdapterError::CharacterAlreadyExists)
+        }
+    }
+
+    async fn remove_character_with_id(&self, character_id: CharacterId) -> DatabaseAdapterResult<()> {
+        let mut guard = self.characters.lock().await;
+        if guard.remove(&character_id) {
+            Ok(())
+        } else {
+            Err(DatabaseAdapterError::CharacterIdNotFound)
+        }
+    }
+
+    async fn get_characters_of_account(&self, username: &str) -> DatabaseAdapterResult<()> {
+        Ok(()) // TODO
+    }
+
+    async fn attach_character_to_account(&self, username: &str, character_id: CharacterId) -> DatabaseAdapterResult<()> {
+        Ok(()) // TODO
+    }
+
+    async fn detach_character_from_account(&self, username: &str, character_id: CharacterId) -> DatabaseAdapterResult<()> {
+        Ok(()) // TODO
+    }
 }
 
 impl DatabaseTestAdapter {
     pub async fn new() -> Self {
         DatabaseTestAdapter {
             accounts: Mutex::new(HashSet::new()),
+            characters: Mutex::new(HashSet::new()),
         }
     }
 }

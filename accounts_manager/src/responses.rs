@@ -25,6 +25,8 @@ impl IntoResponse for ApiError {
                 DatabaseAdapterError::UsernameAlreadyExists => StatusCode::BAD_REQUEST,
                 DatabaseAdapterError::PasswordHashError(_) => StatusCode::INTERNAL_SERVER_ERROR,
                 DatabaseAdapterError::BadPassword => StatusCode::BAD_REQUEST,
+                DatabaseAdapterError::CharacterIdNotFound => StatusCode::BAD_REQUEST,
+                DatabaseAdapterError::CharacterAlreadyExists => StatusCode::BAD_REQUEST,
             }
         };
         (status_code, Json(self)).into_response()
