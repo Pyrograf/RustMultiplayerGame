@@ -4,11 +4,13 @@ use argon2::password_hash::rand_core::OsRng;
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use crate::{DatabaseAdapterError, DatabaseAdapterResult};
+use crate::character::CharacterId;
 
 #[derive(Debug, Clone)]
 pub struct AccountData {
     pub username: String,
     pub hashed_password: String,
+    pub characters: Vec<CharacterId>,
 }
 
 impl PartialEq for AccountData {
@@ -39,6 +41,7 @@ impl AccountData {
         Ok(Self {
             username,
             hashed_password,
+            characters: Vec::new(),
         })
     }
 

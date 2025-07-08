@@ -27,6 +27,10 @@ impl IntoResponse for ApiError {
                 DatabaseAdapterError::BadPassword => StatusCode::BAD_REQUEST,
                 DatabaseAdapterError::CharacterIdNotFound => StatusCode::BAD_REQUEST,
                 DatabaseAdapterError::CharacterAlreadyExists => StatusCode::BAD_REQUEST,
+                DatabaseAdapterError::CannotRemoveCharacterAttachedToAccount => StatusCode::BAD_REQUEST,
+                DatabaseAdapterError::CharacterAlreadyAttached => StatusCode::BAD_REQUEST,
+                DatabaseAdapterError::CharacterNotAttached => StatusCode::BAD_REQUEST,
+                DatabaseAdapterError::CharacterNotOwnedByAccount => StatusCode::BAD_REQUEST,
             }
         };
         (status_code, Json(self)).into_response()

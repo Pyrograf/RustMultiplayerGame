@@ -26,6 +26,18 @@ pub enum DatabaseAdapterError {
 
     #[error("Character already exists")]
     CharacterAlreadyExists,
+
+    #[error("Cannot remove character attached to account")]
+    CannotRemoveCharacterAttachedToAccount,
+
+    #[error("Character already attached")]
+    CharacterAlreadyAttached,
+
+    #[error("Character not attached")]
+    CharacterNotAttached,
+
+    #[error("Character not owned by account")]
+    CharacterNotOwnedByAccount,
 }
 
 pub type  DatabaseAdapterResult<T> = Result<T, DatabaseAdapterError>;
@@ -52,11 +64,13 @@ pub trait DatabaseAdapter: Send + Sync {
 
     async fn add_character(&self, new_character: NewCharacterData) -> DatabaseAdapterResult<CharacterId>;
 
+    async fn get_account_of_character(&self, character_id: CharacterId) -> DatabaseAdapterResult<Option<String>>;
+
     async fn remove_character_with_id(&self, character_id: CharacterId) -> DatabaseAdapterResult<()>;
 
     async fn attach_character_to_account(&self, username: &str, character_id: CharacterId) -> DatabaseAdapterResult<()>;
 
     async fn detach_character_from_account(&self, username: &str, character_id: CharacterId) -> DatabaseAdapterResult<()>;
 
-    async fn get_characters_of_account(&self, username: &str) -> DatabaseAdapterResult<()>;
+    async fn get_characters_of_account(&self, username: &str) -> DatabaseAdapterResult<Vec<CharacterId>>;
 }
