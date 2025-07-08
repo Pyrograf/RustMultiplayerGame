@@ -50,6 +50,7 @@ pub trait DatabaseAdapter: Send + Sync {
 
     async fn add_account(&self, new_account: AccountData) -> DatabaseAdapterResult<()>;
 
+    /// Do not need to remove attached characters, just break attachment
     async fn remove_account_with_username(&self, username: &str) -> DatabaseAdapterResult<()>;
 
     async fn is_password_matching(&self, username: &str, password_plaintext: &str) -> DatabaseAdapterResult<bool>;
@@ -66,6 +67,7 @@ pub trait DatabaseAdapter: Send + Sync {
 
     async fn get_account_of_character(&self, character_id: CharacterId) -> DatabaseAdapterResult<Option<String>>;
 
+    // Requires removing attachment if attach to an account
     async fn remove_character_with_id(&self, character_id: CharacterId) -> DatabaseAdapterResult<()>;
 
     async fn attach_character_to_account(&self, username: &str, character_id: CharacterId) -> DatabaseAdapterResult<()>;

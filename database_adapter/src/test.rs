@@ -426,7 +426,6 @@ mod tests_accounts {
 
         db_adapter.attach_character_to_account("User1", new_character_id).await.unwrap();
 
-        // Additional own test
         assert_eq!(db_adapter.detach_character_from_account("User234", new_character_id).await, Err(DatabaseAdapterError::CharacterNotOwnedByAccount));
         assert_eq!(db_adapter.get_characters_of_account("User1").await.unwrap(),  vec![new_character_id]);
 
@@ -439,5 +438,32 @@ mod tests_accounts {
         // Character was already removed
         db_adapter.detach_character_from_account("User1", new_character_id).await.unwrap();
         assert_eq!(db_adapter.get_characters_of_account("User1").await.unwrap(),  vec![]);
+    }
+
+    #[tokio::test]
+    async fn test_removing_account_with_attached_character() {
+        let db_adapter = DatabaseTestAdapter::new().await;
+
+        let account_1 = AccountData::new("User1".to_string(), "Password12345!@#").unwrap();
+        db_adapter.add_account(account_1).await.unwrap();
+
+        let new_character_data = NewCharacterData {
+            name: "Bob123".to_string(),
+            position_x: 0.0,
+            position_y: 0.0,
+            speed: 1.0
+        };
+        let new_character_id = db_adapter.add_character(new_character_data).await.unwrap();
+
+        db_adapter.attach_character_to_account("User1", new_character_id).await.unwrap();
+
+        // Cannot remove character attached to account
+        assert_eq!(db_adapter.remove_character_with_id(new_character_id).await, Err(DatabaseAdapterError::CannotRemoveCharacterAttachedToAccount));
+
+        // Character was already removed
+        db_adapter.detach_character_from_account("User1", new_character_id).await.unwrap();
+        assert_eq!(db_adapter.get_characters_of_account("User1").await.unwrap(),  vec![]);
+
+        db_adapter.remove_character_with_id(new_character_id).await.unwrap();
     }
 }
