@@ -1,9 +1,10 @@
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
-use crate::game::character::CharacterData;
+use database_adapter::character::CharacterData;
 use crate::game::entity::component::{MovementComponent, NameComponent, PositionComponent};
 use crate::game::entity::EntityId;
+use crate::game::math::Vec2F;
 use crate::game::system::{MovementSystem, NameSystem, PositionSystem};
 
 #[derive(Debug, thiserror::Error)]
@@ -64,7 +65,8 @@ impl WorldManager {
                                     let entity_id = world.generate_new_entity();
                                     
                                     // Safe unwraps - newly created entity
-                                    world.position_system.add_component(entity_id, PositionComponent::new(entity_id, character_data.position)).unwrap();
+                                    let character_position = Vec2F::new(character_data.position_x, character_data.position_y);
+                                    world.position_system.add_component(entity_id, PositionComponent::new(entity_id, character_position)).unwrap();
                                     world.movement_system.add_component(entity_id, MovementComponent::new(entity_id, character_data.speed)).unwrap();
                                     world.name_system.add_component(entity_id, NameComponent::new(entity_id, character_data.name)).unwrap();
                                     

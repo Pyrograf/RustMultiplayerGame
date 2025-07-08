@@ -4,7 +4,9 @@ mod tests {
     use crate::responses::GameServerResponse;
     use crate::testing::tests_trace_setup;
     use std::future::Future;
+    use std::sync::Arc;
     use std::time::Duration;
+    use database_adapter::test::DatabaseTestAdapter;
     use crate::client::GameClient;
     use crate::GameServer;
 
@@ -15,7 +17,8 @@ mod tests {
     {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async move {
-            let server = GameServer::run().await.unwrap();
+            let database_adapter = Arc::new(DatabaseTestAdapter::with_test_data().await);
+            let server = GameServer::run(database_adapter).await.unwrap();
             let server_address = *server.get_address();
             assert_eq!(server.get_connections_count().await.unwrap(), 0);
 

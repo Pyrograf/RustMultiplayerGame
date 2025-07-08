@@ -2,12 +2,11 @@ use crate::requests::GameServerRequest;
 use crate::responses::{GameServerResponse, ResponseResult};
 use std::fmt::Debug;
 use std::io::ErrorKind;
-use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
-use crate::game::character::CharacterId;
+use database_adapter::character::CharacterId;
 
 #[derive(Debug, thiserror::Error)]
 pub enum GameClientError {

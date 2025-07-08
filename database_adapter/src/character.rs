@@ -3,6 +3,26 @@ use std::hash::{Hash, Hasher};
 
 pub type CharacterId  = u32;
 
+#[derive(Debug)]
+pub struct NewCharacterData {
+    pub name: String,
+    pub position_x: f32,
+    pub position_y: f32,
+    pub speed: f32,
+}
+
+impl NewCharacterData {
+    pub fn into_with_id(self, id: CharacterId) -> CharacterData {
+        CharacterData {
+            id,
+            name: self.name,
+            position_x: self.position_x,
+            position_y: self.position_y,
+            speed: self.speed,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct CharacterData {
     pub id: CharacterId,

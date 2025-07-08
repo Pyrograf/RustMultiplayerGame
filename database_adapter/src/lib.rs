@@ -1,11 +1,11 @@
 pub mod account;
 pub mod test;
-mod character;
+pub mod character;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 pub use account::AccountData;
-use crate::character::{CharacterData, CharacterId};
+use crate::character::{CharacterData, CharacterId, NewCharacterData};
 
 #[derive(Debug, thiserror::Error, Serialize, Deserialize, PartialEq, Clone)]
 pub enum DatabaseAdapterError {
@@ -50,7 +50,7 @@ pub trait DatabaseAdapter: Send + Sync {
 
     async fn get_character_by_id(&self, character_id: CharacterId) -> DatabaseAdapterResult<CharacterData>;
 
-    async fn add_character(&self, new_character: CharacterData) -> DatabaseAdapterResult<()>;
+    async fn add_character(&self, new_character: NewCharacterData) -> DatabaseAdapterResult<CharacterId>;
 
     async fn remove_character_with_id(&self, character_id: CharacterId) -> DatabaseAdapterResult<()>;
 

@@ -6,6 +6,7 @@ use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::sync::{mpsc, oneshot, Notify};
 use tokio::task::JoinHandle;
+use database_adapter::DatabaseAdapter;
 use crate::game::Game;
 
 pub mod client;
@@ -46,7 +47,7 @@ impl GameServer {
     const COMMANDS_QUEUE_SIZE: usize = 32;
     const SESSION_END_QUEUE_SIZE: usize = 16;
 
-    pub async fn run() -> tokio::io::Result<Self> {
+    pub async fn run(database_adapter: Arc<dyn DatabaseAdapter>) -> tokio::io::Result<Self> {
         let listener = TcpListener::bind("127.0.0.1:0").await?;
         let local_address = listener.local_addr()?;
         let (commands_tx, mut commands_rx) =
@@ -62,7 +63,7 @@ impl GameServer {
             let mut next_connection_id = 0;
             let mut connection_sessions: Vec<ConnectionSession> = Vec::new();
             let (session_end_tx, mut session_end_rx) = mpsc::channel(Self::SESSION_END_QUEUE_SIZE);
-            let game = Arc::new(Game::new().await);
+            let game = Arc::new(Game::new(database_adapter).await);
 
             let _ = task_ready_tx.send(()).is_ok();
             
@@ -198,6 +199,7 @@ impl GameServer {
 
 #[cfg(test)]
 mod tests {
+    use database_adapter::test::DatabaseTestAdapter;
     use super::*;
     use crate::testing::tests_trace_setup;
 
@@ -205,7 +207,9 @@ mod tests {
     async fn test_starting_shutting_server() {
         tests_trace_setup();
 
-        let server = crate::GameServer::run().await.unwrap();
+        let database_adapter = Arc::new(DatabaseTestAdapter::new().await);
+
+        let server = crate::GameServer::run(database_adapter).await.unwrap();
         let server_address = server.get_address();
         tracing::debug!("server address: {}", server_address);
         let connections_count =  server.get_connections_count().await.unwrap();

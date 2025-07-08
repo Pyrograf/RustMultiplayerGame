@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::game::character::CharacterId;
+use database_adapter::character::CharacterId;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum GameServerRequest {

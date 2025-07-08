@@ -2,11 +2,25 @@ use crate::{AccountData, DatabaseAdapter, DatabaseAdapterError, DatabaseAdapterR
 use std::collections::HashSet;
 use async_trait::async_trait;
 use tokio::sync::Mutex;
-use crate::character::{CharacterData, CharacterId};
+use crate::character::{CharacterData, CharacterId, NewCharacterData};
+
+struct CharactersManager {
+    pub characters: HashSet<CharacterData>,
+    pub new_character_id: CharacterId,
+}
+
+impl CharactersManager {
+    pub fn new() -> Self {
+        Self {
+            characters: HashSet::new(),
+            new_character_id: 0,
+        }
+    }
+}
 
 pub struct DatabaseTestAdapter {
     accounts: Mutex<HashSet<AccountData>>,
-    characters: Mutex<HashSet<CharacterData>>,
+    characters_manager: Mutex<CharactersManager>,
 }
 
 #[async_trait]
@@ -83,7 +97,8 @@ impl DatabaseAdapter for DatabaseTestAdapter {
 
     async fn get_characters(&self) -> DatabaseAdapterResult<Vec<CharacterData>> {
         Ok(
-            self.characters.lock().await
+            self.characters_manager.lock().await
+                .characters
                 .iter()
                 .cloned()
                 .collect()
@@ -91,8 +106,9 @@ impl DatabaseAdapter for DatabaseTestAdapter {
     }
 
     async fn get_character_by_id(&self, character_id: CharacterId) -> DatabaseAdapterResult<CharacterData> {
-        self.characters
+        self.characters_manager
             .lock().await
+            .characters
             .get(&character_id)
             .map_or(Err(DatabaseAdapterError::CharacterIdNotFound), |data| {
                 Ok(data.clone())
@@ -101,26 +117,25 @@ impl DatabaseAdapter for DatabaseTestAdapter {
 
 
 
-    async fn add_character(&self, new_character: CharacterData) -> DatabaseAdapterResult<()> {
-        let mut guard = self.characters.lock().await;
-        if guard.insert(new_character) {
-            Ok(())
+    async fn add_character(&self, new_character: NewCharacterData) -> DatabaseAdapterResult<CharacterId> {
+        let mut guard = self.characters_manager.lock().await;
+        let assigned_character_id = guard.new_character_id;
+        guard.new_character_id += 1;
+
+        if guard.characters.insert(new_character.into_with_id(assigned_character_id)) {
+            Ok(assigned_character_id)
         } else {
             Err(DatabaseAdapterError::CharacterAlreadyExists)
         }
     }
 
     async fn remove_character_with_id(&self, character_id: CharacterId) -> DatabaseAdapterResult<()> {
-        let mut guard = self.characters.lock().await;
-        if guard.remove(&character_id) {
+        let mut guard = self.characters_manager.lock().await;
+        if guard.characters.remove(&character_id) {
             Ok(())
         } else {
             Err(DatabaseAdapterError::CharacterIdNotFound)
         }
-    }
-
-    async fn get_characters_of_account(&self, username: &str) -> DatabaseAdapterResult<()> {
-        Ok(()) // TODO
     }
 
     async fn attach_character_to_account(&self, username: &str, character_id: CharacterId) -> DatabaseAdapterResult<()> {
@@ -130,14 +145,50 @@ impl DatabaseAdapter for DatabaseTestAdapter {
     async fn detach_character_from_account(&self, username: &str, character_id: CharacterId) -> DatabaseAdapterResult<()> {
         Ok(()) // TODO
     }
+
+    async fn get_characters_of_account(&self, username: &str) -> DatabaseAdapterResult<()> {
+        Ok(()) // TODO
+    }
 }
 
 impl DatabaseTestAdapter {
     pub async fn new() -> Self {
         DatabaseTestAdapter {
             accounts: Mutex::new(HashSet::new()),
-            characters: Mutex::new(HashSet::new()),
+            characters_manager: Mutex::new(CharactersManager::new()),
         }
+    }
+
+    pub async fn with_test_data() -> Self {
+        let db = Self::new().await;
+
+        // Accounts
+        db.add_account(AccountData::new("Account1".to_string(), "1234").unwrap()).await.unwrap();
+        db.add_account(AccountData::new("Account2".to_string(), "1234").unwrap()).await.unwrap();
+
+        // Characters
+        let _ = db.add_character(NewCharacterData {
+            name: "Janusz".to_string(),
+            position_x: 0.0,
+            position_y: 0.0,
+            speed: 1.0
+        }).await.unwrap();
+        
+        let _ = db.add_character(NewCharacterData {
+            name: "Tuna".to_string(),
+            position_x: 0.0,
+            position_y: 1.0,
+            speed: 2.0
+        }).await.unwrap();
+
+        let _ = db.add_character(NewCharacterData {
+            name: "Raspberry".to_string(),
+            position_x: -2.0,
+            position_y: 0.0,
+            speed: 1.2
+        }).await.unwrap();
+        
+        db
     }
 }
 

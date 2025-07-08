@@ -1,15 +1,15 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{oneshot, Mutex};
-use crate::game::character::{CharacterData, CharacterId, CharactersDatabase};
+use tokio::sync::Mutex;
+use database_adapter::character::CharacterId;
+use database_adapter::{DatabaseAdapter, DatabaseAdapterError};
 use crate::game::entity::EntityId;
-use crate::game::world::{WorldError, WorldManager, WorldResult};
+use crate::game::world::{WorldError, WorldManager};
 use crate::session::ConnectionSessionId;
 
 pub mod world;
 pub mod player;
 pub mod entity;
-pub mod character;
 
 mod math;
 mod tile_math;
@@ -28,8 +28,11 @@ pub enum GameError {
         entity_id: EntityId,
     },
 
-    #[error("Character not found")]
-    CharacterNotFound,
+    // #[error("Character not found")]
+    // CharacterNotFound,
+    
+    #[error(transparent)]
+    DatabaseAdapterError(#[from] DatabaseAdapterError),
 
     #[error(transparent)]
     WorldError(#[from] WorldError),
@@ -39,17 +42,17 @@ pub type GameResult<T> =  Result<T, GameError>;
 
 pub struct Game {
     pub world_manager: WorldManager,
-    pub character_database: CharactersDatabase,
+    pub database_adapter: Arc<dyn DatabaseAdapter>,
     sessions_entities: Mutex<HashMap<ConnectionSessionId, EntityId>>,
 }
 
 impl Game {
-    pub async fn new() -> Self {
+    pub async fn new(database_adapter: Arc<dyn DatabaseAdapter>) -> Self {
         let world_manager = WorldManager::run().await;
         
         Self {
             world_manager,
-            character_database: CharactersDatabase::new_test(), // TODO replace with real database connection
+            database_adapter,
             sessions_entities:  Mutex::new(HashMap::new()),
         }
     }
@@ -70,12 +73,7 @@ impl Game {
             return Err(GameError::SessionAlreadyAttachedToEntity { entity_id });
         }
 
-        let character_data = match self.character_database.get_character(character_id) {
-            Some(character_data) => character_data.clone(),
-            None => {
-                return Err(GameError::CharacterNotFound);
-            }
-        };
+        let character_data = self.database_adapter.get_character_by_id(character_id).await?;
 
         match self.world_manager.spawn_character_entity(character_data).await {
             Ok(spawned_entity_id) => {
