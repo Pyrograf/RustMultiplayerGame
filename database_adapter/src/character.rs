@@ -1,5 +1,6 @@
 use std::borrow::Borrow;
 use std::hash::{Hash, Hasher};
+use serde::{Deserialize, Serialize};
 
 pub type CharacterId  = u32;
 
@@ -23,7 +24,7 @@ impl NewCharacterData {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CharacterData {
     pub id: CharacterId,
     pub name: String,

@@ -23,8 +23,3 @@ pub struct NewCharacterRequest {
     pub password: String,
     pub character_name: String,
 }
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CharactersListRequest {
-    pub max_count: Option<usize>,
-}

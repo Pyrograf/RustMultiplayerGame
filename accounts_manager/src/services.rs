@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use database_adapter::{AccountData, DatabaseAdapter, DatabaseAdapterError, DatabaseAdapterResult};
-use database_adapter::character::{CharacterId, NewCharacterData};
+use database_adapter::character::{CharacterData, CharacterId, NewCharacterData};
 
 async fn verify_password(
     username: &str,
@@ -50,8 +50,8 @@ pub async fn update_account_password(
 pub async fn get_characters_of_account(
     username: String,
     database_adapter: Arc<dyn DatabaseAdapter>,
-) -> DatabaseAdapterResult<Vec<CharacterId>> {
-    let characters = database_adapter.get_characters_of_account(&username).await?;
+) -> DatabaseAdapterResult<Vec<CharacterData>> {
+    let characters = database_adapter.get_characters_data_of_account(&username).await?;
     Ok(characters)
 }
 

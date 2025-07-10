@@ -5,7 +5,7 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use tokio::sync::Mutex;
 use crate::app_data::AppData;
-use crate::requests::{CharactersListRequest, CreateAccountRequest, DeleteAccountRequestBody, NewCharacterRequest, UpdatePasswordRequest};
+use crate::requests::{CreateAccountRequest, DeleteAccountRequestBody, NewCharacterRequest, UpdatePasswordRequest};
 use crate::responses::{AccountsServerStatus, ApiError};
 use crate::services;
 
@@ -66,7 +66,6 @@ pub async fn update_account_password(
 pub async fn get_characters_of_account(
     State(app_data): State<Arc<Mutex<AppData>>>,
     Path(username): Path<String>,
-    Json(payload): Json<CharactersListRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     let app_data = app_data.lock().await;
     match services::get_characters_of_account(

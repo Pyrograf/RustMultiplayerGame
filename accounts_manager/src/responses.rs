@@ -6,16 +6,10 @@ use database_adapter::character::CharacterId;
 use database_adapter::DatabaseAdapterError;
 
 #[derive(Debug, Serialize, Deserialize)]
-
 pub struct AccountsServerStatus {
     pub motd: String,
     pub accounts_count: usize,
 }
-
-// #[derive(Debug, Serialize, Deserialize)]
-// pub struct CharactersList {
-//     pub characters: Vec<CharacterId>
-// }
 
 #[derive(Debug, thiserror::Error, Serialize, Deserialize, PartialEq, Clone)]
 pub enum ApiError {

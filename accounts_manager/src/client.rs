@@ -1,8 +1,8 @@
-use crate::requests::{CharactersListRequest, CreateAccountRequest, DeleteAccountRequestBody, NewCharacterRequest, UpdatePasswordRequest};
+use crate::requests::{CreateAccountRequest, DeleteAccountRequestBody, NewCharacterRequest, UpdatePasswordRequest};
 use crate::responses::{AccountsServerStatus, ApiError};
 use reqwest::{Client as HttpClient, Response, StatusCode};
 use std::time::Duration;
-use database_adapter::character::CharacterId;
+use database_adapter::character::{CharacterData, CharacterId};
 
 pub struct AccountsManagerClient {
     base_url: String,
@@ -124,18 +124,15 @@ impl AccountsManagerClient {
     pub async fn request_account_characters(
         &self,
         username: String,
-        password: String,
-    ) -> AccountsManagerResult<Vec<CharacterId>> {
+    ) -> AccountsManagerResult<Vec<CharacterData>> {
         let url = format!("{}/api/accounts/{}/characters", self.base_url, username);
-        let request_payload = CharactersListRequest { max_count: None };
         let resp = self
             .http_client
             .get(&url)
-            .json(&request_payload)
             .send()
             .await?;
 
-        let status = resp.json::<Vec<CharacterId>>().await?;
+        let status = resp.json::<Vec<CharacterData>>().await?;
         Ok(status)
     }
 

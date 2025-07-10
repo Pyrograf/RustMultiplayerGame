@@ -74,5 +74,7 @@ pub trait DatabaseAdapter: Send + Sync {
 
     async fn detach_character_from_account(&self, username: &str, character_id: CharacterId) -> DatabaseAdapterResult<()>;
 
+    async fn get_characters_data_of_account(&self, username: &str) -> DatabaseAdapterResult<Vec<CharacterData>>;
+
     async fn get_characters_of_account(&self, username: &str) -> DatabaseAdapterResult<Vec<CharacterId>>;
 }

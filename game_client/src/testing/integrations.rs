@@ -4,11 +4,9 @@ mod tests {
     use accounts_manager::client::AccountsManagerClient;
     use accounts_manager::AccountsManagerServer;
     use database_adapter::test::DatabaseTestAdapter;
-    use database_adapter::AccountData;
     use game_server::client::GameClient;
     use game_server::GameServer;
     use std::sync::Arc;
-    use database_adapter::character::CharacterId;
 
     #[tokio::test]
     async fn test_account_creation_character_creation_entering_game() {
@@ -57,9 +55,11 @@ mod tests {
         // Count character of the account
         let characters_list = accounts_manager_client.request_account_characters(
             username.to_string(),
-            password_plaintext.to_string(),
         ).await.unwrap();
         assert_eq!(characters_list.len(), 1);
+        let new_character_data = characters_list.get(0).unwrap();
+        assert_eq!(new_character_data.name, character_name);
+        assert_eq!(new_character_data.id, new_character_id);
 
         // Enter game world
         assert_eq!(game_client.get_entities_count().await.unwrap(), 0);

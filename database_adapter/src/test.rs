@@ -207,6 +207,16 @@ impl DatabaseAdapter for DatabaseTestAdapter {
         self.remove_account_with_username(username).await?;
         self.add_account(account).await
     }
+    async fn get_characters_data_of_account(&self, username: &str) -> DatabaseAdapterResult<Vec<CharacterData>> {
+        let characters_ids = self.get_characters_of_account(username).await?;
+        let mut characters_data = Vec::with_capacity(characters_ids.len());
+        for character_id in characters_ids {
+            let character_data = self.get_character_by_id(character_id).await?;
+            characters_data.push(character_data);
+        }
+
+        Ok(characters_data)
+    }
 
     async fn get_characters_of_account(&self, username: &str) -> DatabaseAdapterResult<Vec<CharacterId>> {
         let account_data = self.get_account_by_name(username).await?;
