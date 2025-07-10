@@ -1,4 +1,7 @@
-pub mod launcher;
+pub mod manager;
+pub mod views;
+pub mod commands;
+pub mod settings;
 
 use macroquad::math::{vec2, Vec2};
 use macroquad::miniquad::window::set_window_size;
@@ -16,17 +19,5 @@ pub fn constrain_screen_size() {
             screen_width().max(WINDOW_MINIMAL_SIZE.x).round() as u32 + 1,
             screen_height().max(WINDOW_MINIMAL_SIZE.y).round() as u32 + 1
         );
-    }
-}
-
-pub struct GuiSettings {
-    pub scale: f32,
-}
-
-impl Default for GuiSettings {
-    fn default() -> Self {
-        Self {
-            scale: 1.0
-        }
     }
 }
