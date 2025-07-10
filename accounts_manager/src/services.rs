@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use database_adapter::{AccountData, DatabaseAdapter, DatabaseAdapterError, DatabaseAdapterResult};
+use database_adapter::character::{CharacterId, NewCharacterData};
 
 async fn verify_password(
     username: &str,
@@ -44,6 +45,35 @@ pub async fn update_account_password(
 ) -> DatabaseAdapterResult<()> {
     database_adapter.change_password(&username, &password_old, &password_new).await?;
     Ok(())
+}
+
+pub async fn get_characters_of_account(
+    username: String,
+    database_adapter: Arc<dyn DatabaseAdapter>,
+) -> DatabaseAdapterResult<Vec<CharacterId>> {
+    let characters = database_adapter.get_characters_of_account(&username).await?;
+    Ok(characters)
+}
+
+pub async fn create_character_for_account(
+    username: String,
+    password: String,
+    character_name: String,
+    database_adapter: Arc<dyn DatabaseAdapter>,
+) -> DatabaseAdapterResult<CharacterId> {
+    // Here new character get additional initial data.
+    // Consider if it is proper place.
+    // For sure better than handler or request from client.
+    let new_character = NewCharacterData {
+        name: character_name,
+        position_x: 0.0,
+        position_y: 0.0,
+        speed: 1.0,
+    };
+
+    let new_character_id = database_adapter.add_character(new_character).await?;
+    database_adapter.attach_character_to_account(&username, new_character_id).await?;
+    Ok(new_character_id)
 }
 
 #[cfg(test)]

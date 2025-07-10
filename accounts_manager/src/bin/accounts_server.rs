@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use accounts_manager::AccountsManagerServer;
 use database_adapter::test::DatabaseTestAdapter;
-use user_management::AccountsManagerServer;
 
 #[tokio::main]
 async fn main() {
