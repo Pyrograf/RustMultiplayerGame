@@ -15,7 +15,7 @@
 use macroquad::color::Color;
 use macroquad::ui::{root_ui, Skin};
 
-pub async fn launcher_skin() -> Skin {
+pub fn launcher_skin() -> Skin {
     let window_style = root_ui()
         .style_builder()
         .color(Color::from_rgba(200, 200, 230, 255))

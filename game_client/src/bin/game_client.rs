@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use macroquad::prelude::*;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -13,25 +14,31 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let backend_logic = BackendLogic::run();
-    let mut gui_manager = GuiManager::new();
+    let backend_logic = Arc::new(BackendLogic::new());
 
-    let mut gui_renderer = GuiRenderer::new().await;
-    
+    let mut gui_manager = GuiManager::new(backend_logic);
+
+    let mut gui_renderer = GuiRenderer::new();
+
     prevent_quit();
-    
+
     loop {
         // Common graphics related stuff
         clear_background(GRAY);
 
         constrain_screen_size();
-
         // GUI update & draw
+
+        // Process events queued in GUI manager
         gui_manager.update();
 
-        gui_renderer.update(&mut gui_manager);
-
-        gui_renderer.draw_gui(&gui_manager);
+        // Updates internal state of GUI renderer
+        // Captures events from GUI and forward them to GUI manager
+        // Both can mutate because:
+        // - GUI renderer changes its internal state
+        // - GUI manager gets enqueued events
+        // Just draw state of GUI manager
+        gui_renderer.update_draw_gui(&mut gui_manager);
 
         if gui_manager.is_close_requested() {
             break;
@@ -39,9 +46,5 @@ async fn main() {
 
         next_frame().await;
     }
-
-    // TODO close backend_logic
-
     tracing::info!("Game client ended");
-    println!("Game client endedasdasdas");
 }

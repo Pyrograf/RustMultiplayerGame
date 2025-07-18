@@ -18,12 +18,15 @@ pub enum AccountsManagerClientError {
 
     #[error("OtherError, status_code={status}, reason = {reason}")]
     OtherError { status: StatusCode, reason: String },
+
+    #[error("Timeout")]
+    Timeout,
 }
 
-pub type AccountsManagerResult<T> = Result<T, AccountsManagerClientError>;
+pub type AccountsManagerClientResult<T> = Result<T, AccountsManagerClientError>;
 
 impl AccountsManagerClient {
-    pub fn new(address: &str) -> AccountsManagerResult<Self> {
+    pub fn new(address: &str) -> AccountsManagerClientResult<Self> {
         let base_url = format!("http://{}", address.trim_end_matches('/'));
         let http_client = HttpClient::builder()
             .timeout(Duration::from_secs(5))
@@ -37,7 +40,7 @@ impl AccountsManagerClient {
         })
     }
 
-    pub async fn get_server_status(&self) -> AccountsManagerResult<AccountsServerStatus> {
+    pub async fn get_server_status(&self) -> AccountsManagerClientResult<AccountsServerStatus> {
         let url = format!("{}/", self.base_url);
         let resp = self
             .http_client
@@ -53,7 +56,7 @@ impl AccountsManagerClient {
         &self,
         username: String,
         password: String,
-    ) -> AccountsManagerResult<()> {
+    ) -> AccountsManagerClientResult<()> {
         let url = format!("{}/api/account/create", self.base_url);
         let request_payload = CreateAccountRequest { username, password };
         let resp = self
@@ -70,7 +73,7 @@ impl AccountsManagerClient {
         &self,
         username: String,
         password: String,
-    ) -> AccountsManagerResult<()> {
+    ) -> AccountsManagerClientResult<()> {
         let url = format!("{}/api/accounts/{}", self.base_url, username);
         let request_payload = DeleteAccountRequestBody { password };
         let resp = self
@@ -88,7 +91,7 @@ impl AccountsManagerClient {
         username: String,
         password_old: String,
         password_new: String,
-    ) -> AccountsManagerResult<()> {
+    ) -> AccountsManagerClientResult<()> {
         let url = format!("{}/api/accounts/{}/password", self.base_url, username);
         let request_payload = UpdatePasswordRequest { password_old, password_new };
         let resp = self
@@ -104,7 +107,7 @@ impl AccountsManagerClient {
     async fn handle_account_manage_response(
         resp: Response,
         expected_status: StatusCode
-    ) -> AccountsManagerResult<()> {
+    ) -> AccountsManagerClientResult<()> {
         let status = resp.status();
         if expected_status == status {
             Ok(())
