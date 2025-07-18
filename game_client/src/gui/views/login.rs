@@ -12,27 +12,6 @@
 //
 // const DEFAULT_LAUNCHER_WINDOW_SIZE: Vec2 = vec2(400.0, 280.0);
 
-use macroquad::color::Color;
-use macroquad::ui::{root_ui, Skin};
-
-pub fn launcher_skin() -> Skin {
-    let window_style = root_ui()
-        .style_builder()
-        .color(Color::from_rgba(200, 200, 230, 255))
-        .build();
-
-    let button_style = root_ui()
-        .style_builder()
-        .color(Color::from_rgba(200, 200, 180, 255))
-        .build();
-
-    Skin {
-        button_style,
-        window_style,
-        ..root_ui().default_skin()
-    }
-}
-
 
 
     //
