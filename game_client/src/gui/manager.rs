@@ -31,11 +31,10 @@ impl GuiManager {
         // Process in-state
         // Note: no changing state of manager, just emit commands
         if macroquad::input::is_quit_requested() {
-            // TODO add closing dialog
-            // self.close_requested = true
             self.request_gui_command(GuiCommand::ShowShutdownDialog);
         }
 
+        // Examin managers state
         match &mut self.state {
             GuiState::ServerCheckingInProgress => {
                 let server_status_result = self.backend_logic.get_server_status();
@@ -52,13 +51,9 @@ impl GuiManager {
                 }
             },
             GuiState::ServerIsOff { reason, was_acked } => {
-                // TODO await user ack
-                // tracing::error!("Server is off, termnating...");
-                // self.request_gui_command(GuiCommand::Shutdown);
                 if *was_acked {
                     self.close_requested = true;
                 }
-
             },
             GuiState::ServerIsOk { motd, state} => {}
         }
@@ -73,10 +68,7 @@ impl GuiManager {
                 GuiCommand::ServerOn { motd } => {
                     self.state = GuiState::ServerIsOk {
                         motd,
-                        state: GuiStateServerOk::Login {
-                            username: "".to_owned(),
-                            password: "".to_owned(),
-                        },
+                        state: GuiStateServerOk::Login(GuiStateLogin::EnteringData),
                     };
                 },
                 GuiCommand::AckServerOffline => {
@@ -128,26 +120,22 @@ pub enum GuiState {
 
 #[derive(Debug)]
 pub enum GuiStateServerOk {
-    /// Logi
-    Login {
-        username: String,
-        password: String,
-    },
+    Login(GuiStateLogin),
+    Register(GuiStateRegister),
+}
 
-    LoginInProcess,
+#[derive(Debug)]
+pub enum GuiStateLogin {
+    EnteringData,
+    InProgress,
+    Failed,
+    Success,
+}
 
-    LoginFailed {
-        reason: String,
-    },
-
-    Register {
-        username: String,
-        password: String,
-    },
-
-    RegisterInProcess,
-
-    RegisterFailed {
-        reason: String,
-    },
+#[derive(Debug)]
+pub enum GuiStateRegister {
+    EnteringData,
+    InProgress,
+    Failed,
+    Success,
 }

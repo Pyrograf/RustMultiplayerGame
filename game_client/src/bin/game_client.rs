@@ -3,9 +3,8 @@ use macroquad::prelude::*;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use game_client::backend_logic::BackendLogic;
-use game_client::gui::constrain_screen_size;
+use game_client::gui::GuiRenderer;
 use game_client::gui::manager::GuiManager;
-use game_client::gui::views::GuiRenderer;
 
 #[macroquad::main("Client")]
 async fn main() {
@@ -23,12 +22,6 @@ async fn main() {
     prevent_quit();
 
     loop {
-        // Common graphics related stuff
-        clear_background(GRAY);
-
-        constrain_screen_size();
-        // GUI update & draw
-
         // Process events queued in GUI manager
         gui_manager.update();
 
