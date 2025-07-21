@@ -61,7 +61,7 @@ impl BackendLogic {
         }
     }
 
-    pub fn get_server_status(&self) -> AccountsManagerClientResult<AccountsServerStatus> {
+    pub fn fetch_server_status(&self) -> AccountsManagerClientResult<AccountsServerStatus> {
         //request status, await until receive, can has some common timeout
         let (tx, rx) = std::sync::mpsc::channel();
         // Send request to backend thread

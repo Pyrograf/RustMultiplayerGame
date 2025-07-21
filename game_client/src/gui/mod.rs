@@ -8,14 +8,27 @@ mod widgets;
 use macroquad::math::{vec2, Vec2};
 use macroquad::miniquad::window::set_window_size;
 use macroquad::prelude::{screen_height, screen_width};
-use crate::gui::manager::{GuiManager, GuiState};
+use crate::gui::manager::{GuiManager, GuiState, GuiStateLogin, GuiStateRegister, GuiStateServerOk};
 use crate::gui::settings::GuiSettings;
 use macroquad::prelude::*;
 use macroquad::ui::{root_ui, Skin};
 use std::ops::Mul;
 use crate::gui::skins::common_skin;
-use crate::gui::views::{show_server_checking, show_server_off, show_server_ok_login};
+use crate::gui::views::{show_server_checking, show_server_off, show_server_ok_login, show_server_ok_register};
 use crate::gui::widgets::show_exit_pupup;
+
+#[derive(Debug, PartialOrd, PartialEq, Default, Clone)]
+pub struct LoginData {
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Debug, PartialOrd, PartialEq, Default, Clone)]
+pub struct RegisterData {
+    pub username: String,
+    pub password: String,
+    pub password_repeated: String,
+}
 
 /// Infos:
 /// * Screen - entire viewport
@@ -70,7 +83,7 @@ impl GuiRenderer {
         root_ui().push_skin(&self.common_skin);
 
         // Draw view based on GUIManager state
-        let gui_command_to_send = match &gui_manager.state {
+        let gui_command_to_send = match &mut gui_manager.state {
             GuiState::ServerCheckingInProgress => {
                 show_server_checking(window_position, window_size)
             },
@@ -79,17 +92,20 @@ impl GuiRenderer {
                 show_server_off(window_position, window_size, reason)
             },
 
-            GuiState::ServerIsOk { motd, state } => {
-                //match state
-                show_server_ok_login(window_position, window_size, motd)
-                // // TODO complete
-                // GuiStateServerOk::Login(state_login) => {
-                //     // show_server_ok(window_position, window_size, motd)
-                //     None
-                // },
-                // GuiStateServerOk::Register(state_register) => {
-                //     None
-                // },
+            // TODO complete
+            GuiState::ServerIsOk { motd, state } => match state {
+                GuiStateServerOk::Login(state_login) => match state_login {
+                    GuiStateLogin::EnteringData(login_data) => {
+                        show_server_ok_login(window_position, window_size, motd, login_data)
+                    },
+                    _ => None,
+                },
+                GuiStateServerOk::Register(state_register) => match state_register {
+                    GuiStateRegister::EnteringData(register_data) => {
+                        show_server_ok_register(window_position, window_size, motd, register_data)
+                    },
+                    _ => None,
+                },
             }
 
         };

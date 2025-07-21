@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use crate::backend_logic::BackendLogic;
 use crate::gui::commands::GuiCommand;
+use crate::gui::{LoginData, RegisterData};
 use crate::gui::settings::GuiSettings;
 
 
@@ -37,7 +38,7 @@ impl GuiManager {
         // Examin managers state
         match &mut self.state {
             GuiState::ServerCheckingInProgress => {
-                let server_status_result = self.backend_logic.get_server_status();
+                let server_status_result = self.backend_logic.fetch_server_status();
 
                 match server_status_result {
                     Ok(server_status) => {
@@ -68,7 +69,7 @@ impl GuiManager {
                 GuiCommand::ServerOn { motd } => {
                     self.state = GuiState::ServerIsOk {
                         motd,
-                        state: GuiStateServerOk::Login(GuiStateLogin::EnteringData),
+                        state: GuiStateServerOk::Login(GuiStateLogin::EnteringData(LoginData::default())),
                     };
                 },
                 GuiCommand::AckServerOffline => {
@@ -82,6 +83,32 @@ impl GuiManager {
                 },
                 GuiCommand::ProceedShutdownDialog => {
                     self.close_requested = true;
+                },
+                GuiCommand::EnterLoginView => {
+                    if let GuiState::ServerIsOk { motd, state } = &mut self.state {
+                        self.state = GuiState::ServerIsOk {
+                            motd: motd.clone(),
+                            state: GuiStateServerOk::Login(GuiStateLogin::EnteringData(crate::gui::LoginData::default()))
+                        }
+                    } else {
+                        tracing::warn!("Bad state")
+                    }
+                },
+                GuiCommand::EnterRegisterView => {
+                    if let GuiState::ServerIsOk { motd, state } = &mut self.state {
+                        self.state = GuiState::ServerIsOk {
+                            motd: motd.clone(),
+                            state: GuiStateServerOk::Register(GuiStateRegister::EnteringData(crate::gui::RegisterData::default()))
+                        }
+                    } else {
+                        tracing::warn!("Bad state")
+                    }
+                },
+                GuiCommand::PassLoginData(login_data) => {
+                    //TODO
+                },
+                GuiCommand::PassRegisterData(register_data) => {
+                    //TODO
                 },
             }
         }
@@ -126,7 +153,7 @@ pub enum GuiStateServerOk {
 
 #[derive(Debug)]
 pub enum GuiStateLogin {
-    EnteringData,
+    EnteringData(LoginData),
     InProgress,
     Failed,
     Success,
@@ -134,7 +161,7 @@ pub enum GuiStateLogin {
 
 #[derive(Debug)]
 pub enum GuiStateRegister {
-    EnteringData,
+    EnteringData(RegisterData),
     InProgress,
     Failed,
     Success,
