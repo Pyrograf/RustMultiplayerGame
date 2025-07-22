@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use crate::backend_logic::BackendLogic;
 use crate::gui::commands::GuiCommand;
-use crate::gui::{LoginData, RegisterData};
+use crate::gui::{LoginData, LoginFailedReason, RegisterData, RegisterFailedReason};
 use crate::gui::settings::GuiSettings;
 
 
@@ -40,23 +40,53 @@ impl GuiManager {
             GuiState::ServerCheckingInProgress => {
                 let server_status_result = self.backend_logic.fetch_server_status();
 
-                match server_status_result {
+                let gcmd = match server_status_result {
                     Ok(server_status) => {
                         tracing::info!("Server is on, motd='{}'", server_status.motd);
-                        self.request_gui_command(GuiCommand::ServerOn { motd: server_status.motd });
+                        GuiCommand::ServerOn { motd: server_status.motd }
                     },
                     Err(error) => {
                         tracing::error!("Server checking status failed!");
-                        self.request_gui_command(GuiCommand::ServerOff { reason: "Status failed".to_owned() });
+                        GuiCommand::ServerOff { reason: error.to_string() }
                     },
-                }
+                };
+                self.request_gui_command(gcmd);
             },
-            GuiState::ServerIsOff { reason, was_acked } => {
-                if *was_acked {
-                    self.close_requested = true;
-                }
-            },
-            GuiState::ServerIsOk { motd, state} => {}
+            GuiState::ServerIsOff { reason } => {},
+            GuiState::ServerIsOk { motd, state} => match state {
+                GuiStateServerOk::Login(state_login) => match state_login {
+                    GuiStateLogin::ProcessingData(login_data) => {
+                        tracing::info!("Login - processing");
+
+                        // TODO login
+                        // self.backend_logic.
+                        // self.request_gui_command(GuiCo)
+                    },
+                    _ => {}
+                },
+                GuiStateServerOk::Register(state_register) => match state_register {
+                    GuiStateRegister::ProcessingData(register_data) => {
+                        tracing::info!("Register - processing");
+                        // TODO register
+                        let register_account_result = self.backend_logic.request_register_new_account(register_data.clone());
+                        let gcmd = match register_account_result {
+                            Ok(_) => {
+                                tracing::info!("Register account '{}' success!", register_data.username);
+                                GuiCommand::RegisterSuccess(register_data.username.clone())
+                            },
+                            Err(error) => {
+                                tracing::error!("Register account '{}' failed!", register_data.username);
+                                GuiCommand::RegisterFailed(RegisterFailedReason {
+                                    username: register_data.username.clone(),
+                                    reason: error.to_string()
+                                })
+                            }
+                        };
+                        self.request_gui_command(gcmd);
+                    },
+                    _ => {}
+                },
+            }
         }
 
         // Process commands
@@ -64,7 +94,7 @@ impl GuiManager {
         while let Some(gcmd) = self.cmds_queue.pop_front() {
             match gcmd {
                 GuiCommand::ServerOff { reason } => {
-                    self.state = GuiState::ServerIsOff { reason, was_acked: false };
+                    self.state = GuiState::ServerIsOff { reason};
                 },
                 GuiCommand::ServerOn { motd } => {
                     self.state = GuiState::ServerIsOk {
@@ -84,11 +114,11 @@ impl GuiManager {
                 GuiCommand::ProceedShutdownDialog => {
                     self.close_requested = true;
                 },
-                GuiCommand::EnterLoginView => {
+                GuiCommand::EnterLoginView(login_data) => {
                     if let GuiState::ServerIsOk { motd, state } = &mut self.state {
                         self.state = GuiState::ServerIsOk {
                             motd: motd.clone(),
-                            state: GuiStateServerOk::Login(GuiStateLogin::EnteringData(crate::gui::LoginData::default()))
+                            state: GuiStateServerOk::Login(GuiStateLogin::EnteringData(login_data.unwrap_or_default()))
                         }
                     } else {
                         tracing::warn!("Bad state")
@@ -98,17 +128,71 @@ impl GuiManager {
                     if let GuiState::ServerIsOk { motd, state } = &mut self.state {
                         self.state = GuiState::ServerIsOk {
                             motd: motd.clone(),
-                            state: GuiStateServerOk::Register(GuiStateRegister::EnteringData(crate::gui::RegisterData::default()))
+                            state: GuiStateServerOk::Register(GuiStateRegister::EnteringData(RegisterData::default()))
                         }
                     } else {
                         tracing::warn!("Bad state")
                     }
                 },
                 GuiCommand::PassLoginData(login_data) => {
-                    //TODO
+                    if let GuiState::ServerIsOk { motd, state } = &mut self.state {
+                        self.state = GuiState::ServerIsOk {
+                            motd: motd.clone(),
+                            state: GuiStateServerOk::Login(GuiStateLogin::ProcessingData(login_data))
+                        }
+                    } else {
+                        tracing::warn!("Bad state")
+                    }
+                },
+                GuiCommand::LoginFailed(reason) => {
+                    if let GuiState::ServerIsOk { motd, state } = &mut self.state {
+                        self.state = GuiState::ServerIsOk {
+                            motd: motd.clone(),
+                            state: GuiStateServerOk::Login(GuiStateLogin::Failed(reason))
+                        }
+                    } else {
+                        tracing::warn!("Bad state")
+                    }
+                },
+                GuiCommand::LoginSuccess => {
+                    if let GuiState::ServerIsOk { motd, state } = &mut self.state {
+                        self.state = GuiState::ServerIsOk {
+                            motd: motd.clone(),
+                            state: GuiStateServerOk::Login(GuiStateLogin::Success("Huh unknown?".to_owned()))
+                        }
+                    } else {
+                        tracing::warn!("Bad state")
+                    }
                 },
                 GuiCommand::PassRegisterData(register_data) => {
-                    //TODO
+                    if let GuiState::ServerIsOk { motd, state } = &mut self.state {
+                        self.state = GuiState::ServerIsOk {
+                            motd: motd.clone(),
+                            state: GuiStateServerOk::Register(GuiStateRegister::ProcessingData(register_data))
+                        }
+                    } else {
+                        tracing::warn!("Bad state")
+                    }
+                },
+                GuiCommand::RegisterFailed(reason) => {
+                    if let GuiState::ServerIsOk { motd, state } = &mut self.state {
+                        self.state = GuiState::ServerIsOk {
+                            motd: motd.clone(),
+                            state: GuiStateServerOk::Register(GuiStateRegister::Failed(reason))
+                        }
+                    } else {
+                        tracing::warn!("Bad state")
+                    }
+                },
+                GuiCommand::RegisterSuccess(username) => {
+                    if let GuiState::ServerIsOk { motd, state } = &mut self.state {
+                        self.state = GuiState::ServerIsOk {
+                            motd: motd.clone(),
+                            state: GuiStateServerOk::Register(GuiStateRegister::Success(username))
+                        }
+                    } else {
+                        tracing::warn!("Bad state")
+                    }
                 },
             }
         }
@@ -135,7 +219,6 @@ pub enum GuiState {
 
     ServerIsOff {
         reason: String,
-        was_acked: bool,
     },
 
     // TODO probably states related to each view -> if same data it will be transfered during view construction
@@ -154,15 +237,15 @@ pub enum GuiStateServerOk {
 #[derive(Debug)]
 pub enum GuiStateLogin {
     EnteringData(LoginData),
-    InProgress,
-    Failed,
-    Success,
+    ProcessingData(LoginData),
+    Failed(LoginFailedReason), // need some option to collect notifications, ACK come back to entering data
+    Success(String), // meybe add inner data
 }
 
 #[derive(Debug)]
 pub enum GuiStateRegister {
     EnteringData(RegisterData),
-    InProgress,
-    Failed,
-    Success,
+    ProcessingData(RegisterData),
+    Failed(RegisterFailedReason), // need some option to collect notifications, ACK come back to entering data
+    Success(String), // Back to login option
 }

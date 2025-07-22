@@ -14,7 +14,7 @@ use macroquad::prelude::*;
 use macroquad::ui::{root_ui, Skin};
 use std::ops::Mul;
 use crate::gui::skins::common_skin;
-use crate::gui::views::{show_server_checking, show_server_off, show_server_ok_login, show_server_ok_register};
+use crate::gui::views::{show_login_entering_data, show_login_failed, show_login_processing_data, show_login_success, show_register_entering_data, show_register_failed, show_register_processing_data, show_register_success, show_server_checking, show_server_off};
 use crate::gui::widgets::show_exit_pupup;
 
 #[derive(Debug, PartialOrd, PartialEq, Default, Clone)]
@@ -24,10 +24,22 @@ pub struct LoginData {
 }
 
 #[derive(Debug, PartialOrd, PartialEq, Default, Clone)]
+pub struct LoginFailedReason {
+    pub username: String,
+    pub reason: String,
+}
+
+#[derive(Debug, PartialOrd, PartialEq, Default, Clone)]
 pub struct RegisterData {
     pub username: String,
     pub password: String,
     pub password_repeated: String,
+}
+
+#[derive(Debug, PartialOrd, PartialEq, Default, Clone)]
+pub struct RegisterFailedReason {
+    pub username: String,
+    pub reason: String,
 }
 
 /// Infos:
@@ -82,34 +94,52 @@ impl GuiRenderer {
         // Select skin
         root_ui().push_skin(&self.common_skin);
 
-        // Draw view based on GUIManager state
+        // Draw view based on GUIManager state, capture GUI events
         let gui_command_to_send = match &mut gui_manager.state {
             GuiState::ServerCheckingInProgress => {
                 show_server_checking(window_position, window_size)
             },
 
-            GuiState::ServerIsOff { reason, was_acked: _ } => {
+            GuiState::ServerIsOff { reason} => {
                 show_server_off(window_position, window_size, reason)
             },
 
-            // TODO complete
             GuiState::ServerIsOk { motd, state } => match state {
                 GuiStateServerOk::Login(state_login) => match state_login {
                     GuiStateLogin::EnteringData(login_data) => {
-                        show_server_ok_login(window_position, window_size, motd, login_data)
+                        show_login_entering_data(window_position, window_size, motd, login_data)
                     },
-                    _ => None,
+                    GuiStateLogin::ProcessingData(login_data) => {
+                        show_login_processing_data(window_position, window_size, motd, &login_data.username)
+                    },
+                    GuiStateLogin::Failed(reason) => {
+                        show_login_failed(window_position, window_size, motd, reason)
+                    },
+                    GuiStateLogin::Success(username) => {
+                        // Probably will be expanded later to CRUD characters
+                        // TODO proceed
+                        show_login_success(window_position, window_size, motd, username)
+                    },
                 },
                 GuiStateServerOk::Register(state_register) => match state_register {
                     GuiStateRegister::EnteringData(register_data) => {
-                        show_server_ok_register(window_position, window_size, motd, register_data)
+                        show_register_entering_data(window_position, window_size, motd, register_data)
                     },
-                    _ => None,
+                    GuiStateRegister::ProcessingData(state_register) => {
+                        show_register_processing_data(window_position, window_size, motd, &state_register.username)
+                    },
+                    GuiStateRegister::Failed(reason) => {
+                        show_register_failed(window_position, window_size, motd, reason)
+                    },
+                    GuiStateRegister::Success(username) => {
+                        show_register_success(window_position, window_size, motd, username)
+                    },
                 },
             }
 
         };
 
+        // Pass GUI commands further
         if let Some(gui_command_to_send) = gui_command_to_send {
             gui_manager.request_gui_command(gui_command_to_send);
         }

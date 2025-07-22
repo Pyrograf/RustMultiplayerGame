@@ -2,11 +2,16 @@ use std::time::Duration;
 use accounts_manager::AccountsManagerServer;
 use accounts_manager::client::{AccountsManagerClient, AccountsManagerClientError, AccountsManagerClientResult};
 use accounts_manager::responses::AccountsServerStatus;
+use crate::gui::RegisterData;
 
 enum BackendRequest {
     GetServerStatus {
         response: std::sync::mpsc::Sender<AccountsManagerClientResult<AccountsServerStatus>>,
     },
+    RegisterNewAccount {
+        register_data: RegisterData,
+        response: std::sync::mpsc::Sender<AccountsManagerClientResult<()>>,
+    }
 }
 
 #[derive(Debug)]
@@ -45,6 +50,10 @@ impl BackendLogic {
                             BackendRequest::GetServerStatus { response } => {
                                 let status = account_manager_client.get_server_status().await;
                                 let _ = response.send(status);
+                            },
+                            BackendRequest::RegisterNewAccount { register_data, response } => {
+                                let status = account_manager_client.request_create_account(register_data.username, register_data.password).await;
+                                let _ = response.send(status);
                             }
                         }
                     }
@@ -67,6 +76,22 @@ impl BackendLogic {
         // Send request to backend thread
         self.sender
             .send(BackendRequest::GetServerStatus { response: tx })
+            .expect("Backend thread has shut down");
+
+        // Wait for response (with timeout)
+        match rx.recv_timeout(Duration::from_secs(5)) {
+            Ok(res) => res,
+            Err(_) => Err(AccountsManagerClientError::Timeout), // Make sure you define this error variant
+        }
+    }
+
+
+    pub fn request_register_new_account(&self, register_data: RegisterData) -> AccountsManagerClientResult<()> {
+        //request status, await until receive, can has some common timeout
+        let (tx, rx) = std::sync::mpsc::channel();
+        // Send request to backend thread
+        self.sender
+            .send(BackendRequest::RegisterNewAccount { register_data, response: tx })
             .expect("Backend thread has shut down");
 
         // Wait for response (with timeout)

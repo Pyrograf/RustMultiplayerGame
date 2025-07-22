@@ -1,4 +1,4 @@
-use crate::gui::{LoginData, RegisterData};
+use crate::gui::{LoginData, LoginFailedReason, RegisterData, RegisterFailedReason};
 
 #[derive(Debug, PartialOrd, PartialEq)]
 pub enum GuiCommand {
@@ -15,8 +15,13 @@ pub enum GuiCommand {
     ProceedShutdownDialog,
 
     EnterRegisterView,
-    EnterLoginView,
+    EnterLoginView(Option<LoginData>),
     
     PassLoginData(LoginData),
+    LoginFailed(LoginFailedReason),
+    LoginSuccess,
+    
     PassRegisterData(RegisterData),
+    RegisterFailed(RegisterFailedReason),
+    RegisterSuccess(String),
 }
