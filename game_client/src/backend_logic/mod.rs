@@ -1,7 +1,9 @@
+use std::sync::Arc;
 use std::time::Duration;
 use accounts_manager::AccountsManagerServer;
 use accounts_manager::client::{AccountsManagerClient, AccountsManagerClientError, AccountsManagerClientResult};
 use accounts_manager::responses::AccountsServerStatus;
+use database_adapter::test::DatabaseTestAdapter;
 use crate::gui::RegisterData;
 
 enum BackendRequest {
@@ -34,7 +36,8 @@ impl BackendLogic {
                 println!("Starting test servers!");
 
                 // Comment to test with server offline
-                let account_manager_server = AccountsManagerServer::run().await.unwrap();
+                let db_adapter = Arc::new(DatabaseTestAdapter::new().await);
+                let account_manager_server = AccountsManagerServer::run(db_adapter).await.unwrap();
                 let account_manager_server_address = account_manager_server.get_address();
                 let account_manager_server_address = account_manager_server_address.to_string();
 

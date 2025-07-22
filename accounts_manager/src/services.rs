@@ -1,138 +1,161 @@
-use crate::account::{Account, AccountError, AccountResult, AccountsManager};
+use std::sync::Arc;
+use database_adapter::{AccountData, DatabaseAdapter, DatabaseAdapterError, DatabaseAdapterResult};
+use database_adapter::character::{CharacterData, CharacterId, NewCharacterData};
 
-fn verify_password(
+async fn verify_password(
     username: &str,
     password: &str,
-    accounts_manager: &AccountsManager
-) -> AccountResult<()> {
-    let account = accounts_manager
-        .find_account_by_username(&username)
-        .ok_or(AccountError::UsernameNotFound)?;
+    database_adapter: Arc<dyn DatabaseAdapter>,
+) -> DatabaseAdapterResult<()> {
+    let account = database_adapter
+        .get_account_by_name(&username).await?;
     let password_matches = account.verify(&password)?;
     if !password_matches {
-        return Err(AccountError::BadPassword);
+        return Err(DatabaseAdapterError::BadPassword);
     } else {
         Ok(())
     }
 }
 
-pub fn create_account(
+pub async fn create_account(
     username: String,
     password: String,
-    accounts_manager: &mut AccountsManager,
-) -> AccountResult<()> {
-    let new_account = Account::new(username, &password)?;
-    accounts_manager.add_account(new_account)?;
+    database_adapter: Arc<dyn DatabaseAdapter>,
+) -> DatabaseAdapterResult<()> {
+    let new_account = AccountData::new(username, &password)?;
+    database_adapter.add_account(new_account).await?;
     Ok(())
 }
 
-pub fn delete_account(
+pub async fn delete_account(
     username: String,
     password: String,
-    accounts_manager: &mut AccountsManager,
-) -> AccountResult<()> {
-    verify_password(&username, &password, &accounts_manager)?;
-    accounts_manager.remove_account(&username)?;
+    database_adapter: Arc<dyn DatabaseAdapter>,
+) -> DatabaseAdapterResult<()> {
+    verify_password(&username, &password, database_adapter.clone()).await?;
+    database_adapter.remove_account_with_username(&username).await?;
     Ok(())
 }
 
-pub fn update_account_password(
+pub async fn update_account_password(
     username: String,
     password_old: String,
     password_new: String,
-    accounts_manager: &mut AccountsManager,
-) -> AccountResult<()> {
-    verify_password(&username, &password_old, &accounts_manager)?;
-
-    // Take account
-    let mut account = accounts_manager.take_account(&username)
-        .expect("Account should be found");
-
-    // Replace password
-    account.set_password(&password_new)?;
-
-    //Place account back
-    accounts_manager.add_account(account)?;
+    database_adapter: Arc<dyn DatabaseAdapter>,
+) -> DatabaseAdapterResult<()> {
+    database_adapter.change_password(&username, &password_old, &password_new).await?;
     Ok(())
+}
+
+pub async fn get_characters_of_account(
+    username: String,
+    database_adapter: Arc<dyn DatabaseAdapter>,
+) -> DatabaseAdapterResult<Vec<CharacterData>> {
+    let characters = database_adapter.get_characters_data_of_account(&username).await?;
+    Ok(characters)
+}
+
+pub async fn create_character_for_account(
+    username: String,
+    password: String,
+    character_name: String,
+    database_adapter: Arc<dyn DatabaseAdapter>,
+) -> DatabaseAdapterResult<CharacterId> {
+    // Here new character get additional initial data.
+    // Consider if it is proper place.
+    // For sure better than handler or request from client.
+    let new_character = NewCharacterData {
+        name: character_name,
+        position_x: 0.0,
+        position_y: 0.0,
+        speed: 1.0,
+    };
+
+    let new_character_id = database_adapter.add_character(new_character).await?;
+    database_adapter.attach_character_to_account(&username, new_character_id).await?;
+    Ok(new_character_id)
 }
 
 #[cfg(test)]
 mod tests {
+    use database_adapter::DatabaseAdapterError;
+    use database_adapter::test::DatabaseTestAdapter;
     use super::*;
-    #[test]
-    fn test_creating_account() {
-        let mut accounts_manager = AccountsManager::new();
+
+    #[tokio::test]
+    async fn test_creating_account() {
+        let database_adapter = Arc::new(DatabaseTestAdapter::new().await);
 
         create_account(
             "User1".to_string(),
             "psswdrad123456%^&*".to_string(),
-            &mut accounts_manager,
-        )
+            database_adapter.clone(),
+        ).await
         .unwrap();
 
         create_account(
             "User2".to_string(),
             "psswdrad123456%^&*".to_string(),
-            &mut accounts_manager,
-        )
+            database_adapter.clone(),
+        ).await
         .unwrap();
 
         create_account(
             "User".to_string(),
             "psswdrad123456%^&*".to_string(),
-            &mut accounts_manager,
-        )
+            database_adapter.clone(),
+        ).await
         .unwrap();
 
         let err_user_alredy_exists = create_account(
             "User1".to_string(),
             "psswdrad123456%^&*".to_string(),
-            &mut accounts_manager,
-        )
+            database_adapter.clone(),
+        ).await
         .unwrap_err();
 
         assert!(
-            matches!(err_user_alredy_exists, AccountError::UsernameAlreadyExists),
+            matches!(err_user_alredy_exists, DatabaseAdapterError::UsernameAlreadyExists),
             "Err {:?}",
             err_user_alredy_exists
         );
-        assert_eq!(accounts_manager.count(), 3);
+        assert_eq!(database_adapter.get_accounts_count().await.unwrap(), 3);
     }
 
-    #[test]
-    fn test_delete_account() {
-        let mut accounts_manager = AccountsManager::new();
+    #[tokio::test]
+    async fn test_delete_account() {
+        let database_adapter = Arc::new(DatabaseTestAdapter::new().await);
 
-        let account_1 = Account::new("User11".to_string(), "qwertyuio12345$%^&").unwrap();
-        accounts_manager.add_account(account_1).unwrap();
-        assert_eq!(accounts_manager.count(), 1);
+        let account_1 = AccountData::new("User11".to_string(), "qwertyuio12345$%^&").unwrap();
+        database_adapter.add_account(account_1).await.unwrap();
+        assert_eq!(database_adapter.get_accounts_count().await.unwrap(), 1);
 
         let account_2_user = "User12";
         let account_2_psswrd = "mehmeh12345$%^&";
-        let account_2 = Account::new(account_2_user.to_string(), account_2_psswrd).unwrap();
-        accounts_manager.add_account(account_2).unwrap();
-        assert_eq!(accounts_manager.count(), 2);
+        let account_2 = AccountData::new(account_2_user.to_string(), account_2_psswrd).unwrap();
+        database_adapter.add_account(account_2).await.unwrap();
+        assert_eq!(database_adapter.get_accounts_count().await.unwrap(), 2);
 
         delete_account(
             account_2_user.to_string(),
             account_2_psswrd.to_string(),
-            &mut accounts_manager,
-        )
+            database_adapter.clone(),
+        ).await
         .unwrap();
-        assert_eq!(accounts_manager.count(), 1);
+        assert_eq!(database_adapter.get_accounts_count().await.unwrap(), 1);
 
         let err_user_not_found = delete_account(
             account_2_user.to_string(),
             account_2_psswrd.to_string(),
-            &mut accounts_manager,
-        )
+            database_adapter.clone(),
+        ).await
         .unwrap_err();
 
         assert!(
-            matches!(err_user_not_found, AccountError::UsernameNotFound),
+            matches!(err_user_not_found, DatabaseAdapterError::UsernameNotFound),
             "Err {:?}",
             err_user_not_found
         );
-        assert_eq!(accounts_manager.count(), 1);
+        assert_eq!(database_adapter.get_accounts_count().await.unwrap(), 1);
     }
 }

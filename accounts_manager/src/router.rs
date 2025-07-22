@@ -23,6 +23,14 @@ pub fn get_router(app_data: Arc<Mutex<AppData>>) -> Router {
             "/accounts/{username}/password",
             patch(update_account_password)
         )
+        .route(
+            "/accounts/{username}/characters",
+            get(get_characters_of_account)
+        )
+        .route(
+            "/accounts/{username}/character/new",
+            post(create_character_for_account)
+        )
         .with_state(app_data.clone());
 
     Router::new()

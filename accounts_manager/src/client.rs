@@ -1,7 +1,8 @@
-use crate::requests::{CreateAccountRequest, DeleteAccountRequestBody, UpdatePasswordRequest};
+use crate::requests::{CreateAccountRequest, DeleteAccountRequestBody, NewCharacterRequest, UpdatePasswordRequest};
 use crate::responses::{AccountsServerStatus, ApiError};
 use reqwest::{Client as HttpClient, Response, StatusCode};
 use std::time::Duration;
+use database_adapter::character::{CharacterData, CharacterId};
 
 pub struct AccountsManagerClient {
     base_url: String,
@@ -102,6 +103,40 @@ impl AccountsManagerClient {
             .await?;
 
         Self::handle_account_manage_response(resp, StatusCode::OK).await
+    }
+
+    pub async fn request_create_character(
+        &self,
+        username: String,
+        password: String,
+        character_name: String,
+    ) -> AccountsManagerClientResult<CharacterId> {
+        let url = format!("{}/api/accounts/{}/character/new", self.base_url, username);
+        let request_payload = NewCharacterRequest { password, character_name };
+        let resp = self
+            .http_client
+            .post(&url)
+            .json(&request_payload)
+            .send()
+            .await?;
+
+        let status = resp.json::<CharacterId>().await?;
+        Ok(status)
+    }
+
+    pub async fn request_account_characters(
+        &self,
+        username: String,
+    ) -> AccountsManagerClientResult<Vec<CharacterData>> {
+        let url = format!("{}/api/accounts/{}/characters", self.base_url, username);
+        let resp = self
+            .http_client
+            .get(&url)
+            .send()
+            .await?;
+
+        let status = resp.json::<Vec<CharacterData>>().await?;
+        Ok(status)
     }
 
     async fn handle_account_manage_response(
