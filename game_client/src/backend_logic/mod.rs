@@ -4,7 +4,7 @@ use accounts_manager::AccountsManagerServer;
 use accounts_manager::client::{AccountsManagerClient, AccountsManagerClientError, AccountsManagerClientResult};
 use accounts_manager::responses::AccountsServerStatus;
 use database_adapter::test::DatabaseTestAdapter;
-use crate::gui::RegisterData;
+use crate::gui::{LoginData, RegisterData};
 
 enum BackendRequest {
     GetServerStatus {
@@ -13,7 +13,11 @@ enum BackendRequest {
     RegisterNewAccount {
         register_data: RegisterData,
         response: std::sync::mpsc::Sender<AccountsManagerClientResult<()>>,
-    }
+    },
+    // LoginToAccount {
+    //     login_data: LoginData,
+    //     response: std::sync::mpsc::Sender<AccountsManagerClientResult<()>>,
+    // },
 }
 
 #[derive(Debug)]
@@ -57,7 +61,11 @@ impl BackendLogic {
                             BackendRequest::RegisterNewAccount { register_data, response } => {
                                 let status = account_manager_client.request_create_account(register_data.username, register_data.password).await;
                                 let _ = response.send(status);
-                            }
+                            },
+                            // BackendRequest::LoginToAccount { login_data, response } => {
+                            //     let status = account_manager_client.request_login_to_account(register_data.username, register_data.password).await;
+                            //     let _ = response.send(status);
+                            // }
                         }
                     }
 
@@ -103,4 +111,20 @@ impl BackendLogic {
             Err(_) => Err(AccountsManagerClientError::Timeout), // Make sure you define this error variant
         }
     }
+
+    // TODO - consider some form of token
+    // pub fn request_login_to_account(&self, login_data: LoginData) -> AccountsManagerClientResult<()> {
+    //     //request status, await until receive, can has some common timeout
+    //     let (tx, rx) = std::sync::mpsc::channel();
+    //     // Send request to backend thread
+    //     self.sender
+    //         .send(BackendRequest::LoginToAccount { login_data, response: tx })
+    //         .expect("Backend thread has shut down");
+    //
+    //     // Wait for response (with timeout)
+    //     match rx.recv_timeout(Duration::from_secs(5)) {
+    //         Ok(res) => res,
+    //         Err(_) => Err(AccountsManagerClientError::Timeout), // Make sure you define this error variant
+    //     }
+    // }
 }

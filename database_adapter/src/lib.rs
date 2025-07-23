@@ -12,6 +12,9 @@ pub enum DatabaseAdapterError {
     #[error("Password hash error, reason = '{0}'")]
     PasswordHashError(String), // argon2::password_hash::Error is not std::error::Error based
 
+    #[error("JWT error, reason = '{0}'")]
+    JwtError(String),
+
     #[error("Username already exists")]
     UsernameAlreadyExists,
 
@@ -77,4 +80,8 @@ pub trait DatabaseAdapter: Send + Sync {
     async fn get_characters_data_of_account(&self, username: &str) -> DatabaseAdapterResult<Vec<CharacterData>>;
 
     async fn get_characters_of_account(&self, username: &str) -> DatabaseAdapterResult<Vec<CharacterId>>;
+
+    async fn get_jwt_private_key(&self)  -> DatabaseAdapterResult<Vec<u8>>;
+
+    async fn get_jwt_public_key(&self)  -> DatabaseAdapterResult<Vec<u8>>;
 }

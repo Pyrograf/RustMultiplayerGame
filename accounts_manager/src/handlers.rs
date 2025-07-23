@@ -3,6 +3,7 @@ use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
+use axum_jwt_auth::Claims;
 use tokio::sync::Mutex;
 use crate::app_data::AppData;
 use crate::requests::{CreateAccountRequest, DeleteAccountRequestBody, NewCharacterRequest, UpdatePasswordRequest};
@@ -19,7 +20,7 @@ pub async fn overall_status(State(app_data): State<Arc<Mutex<AppData>>>) -> Json
         motd: String::from("Accounts manager is running!"),
         accounts_count,
     };
-
+    
     Json(status)
 }
 
@@ -30,6 +31,18 @@ pub async fn create_account(
     let app_data = app_data.lock().await;
     match services::create_account(payload.username, payload.password, app_data.database_adapter.clone()).await {
         Ok(account) => Ok((StatusCode::CREATED, "Account created")),
+        Err(err) => Err(err.into()),
+    }
+}
+
+pub async fn login_to_account(
+    State(app_data): State<Arc<Mutex<AppData>>>,
+    Json(payload): Json<CreateAccountRequest>,
+) -> Result<impl IntoResponse, ApiError> {
+    let app_data = app_data.lock().await;
+    
+    match services::login_to_account(payload.username, payload.password, app_data.database_adapter.clone()).await {
+        Ok(account) => Ok((StatusCode::OK, "Login successful")),
         Err(err) => Err(err.into()),
     }
 }

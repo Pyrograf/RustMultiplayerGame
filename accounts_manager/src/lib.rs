@@ -19,6 +19,9 @@ pub mod responses;
 pub mod services;
 mod testing;
 
+pub const SERVICE_AUDIENCE: &str = "accounts_manager";
+pub const JWT_EXPIRATION_HOURS: i64 = 1;
+
 #[derive(Debug)]
 pub struct AccountsManagerServer {
     task_handle: tokio::task::JoinHandle<Result<(), std::io::Error>>,
@@ -30,7 +33,7 @@ pub struct AccountsManagerServer {
 impl AccountsManagerServer {
     pub async fn run(database_adapter: Arc<dyn DatabaseAdapter>) -> tokio::io::Result<Self> {
 
-        let app_data = Arc::new(Mutex::new(AppData::new(database_adapter)));
+        let app_data = Arc::new(Mutex::new(AppData::new(database_adapter).await));
 
         let app = router::get_router(app_data.clone())
             .layer(TraceLayer::new_for_http()

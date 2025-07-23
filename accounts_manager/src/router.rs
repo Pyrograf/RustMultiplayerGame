@@ -16,6 +16,10 @@ pub fn get_router(app_data: Arc<Mutex<AppData>>) -> Router {
             post(create_account),
         )
         .route(
+            "/account/login",
+            post(login_to_account),
+        )
+        .route(
             "/accounts/{username}",
             delete(delete_account)
         )

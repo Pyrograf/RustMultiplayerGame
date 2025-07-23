@@ -222,6 +222,15 @@ impl DatabaseAdapter for DatabaseTestAdapter {
         let account_data = self.get_account_by_name(username).await?;
         Ok(account_data.characters)
     }
+
+
+    async fn get_jwt_private_key(&self)  -> DatabaseAdapterResult<Vec<u8>> {
+        Ok(include_bytes!("jwt.key").to_vec())
+    }
+
+    async fn get_jwt_public_key(&self)  -> DatabaseAdapterResult<Vec<u8>> {
+        Ok(include_bytes!("jwt.key.pub").to_vec())
+    }
 }
 
 impl DatabaseTestAdapter {

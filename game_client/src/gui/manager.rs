@@ -67,7 +67,6 @@ impl GuiManager {
                 GuiStateServerOk::Register(state_register) => match state_register {
                     GuiStateRegister::ProcessingData(register_data) => {
                         tracing::info!("Register - processing");
-                        // TODO register
                         let register_account_result = self.backend_logic.request_register_new_account(register_data.clone());
                         let gcmd = match register_account_result {
                             Ok(_) => {

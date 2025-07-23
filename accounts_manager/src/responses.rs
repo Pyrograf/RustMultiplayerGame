@@ -31,6 +31,7 @@ impl IntoResponse for ApiError {
                 DatabaseAdapterError::CharacterAlreadyAttached => StatusCode::BAD_REQUEST,
                 DatabaseAdapterError::CharacterNotAttached => StatusCode::BAD_REQUEST,
                 DatabaseAdapterError::CharacterNotOwnedByAccount => StatusCode::BAD_REQUEST,
+                DatabaseAdapterError::JwtError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             }
         };
         (status_code, Json(self)).into_response()

@@ -8,7 +8,9 @@ tokio = { workspace = true }
 thiserror = { workspace = true }
 
 axum = { version = "0.8.4" }
-axum-login = "0.17.0"
+axum-extra = { version = "0.10.1", features = ["typed-header"] }
+jsonwebtoken = { version = "9.3.1" }
+axum-jwt-auth = { version = "0.5.1" }
 reqwest = { version = "0.12.19", features = ["json"] }
 
 tracing = { workspace = true }
@@ -25,3 +27,4 @@ rand_core = { version = "=0.6.4" , features = ["getrandom"]}
 
 database_adapter = { version = "*", path = "../database_adapter"}
 async-trait = { workspace = true }
+chrono = { workspace = true }

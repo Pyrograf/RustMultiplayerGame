@@ -190,7 +190,8 @@ pub mod register {
             .ui(&mut *root_ui(), |ui| {
                 ui.label(None, &format!("Registering '{username}'"));
                 ui.label(None, &format!("Motd = '{motd}'"));
-                //TODO
+                // Probably not visible to user due to blocking when creating account
+                // TODO remove, and block inside inputing data,hide register buttonjust
             });
 
         output_cmd
@@ -211,7 +212,6 @@ pub mod register {
             .ui(&mut *root_ui(), |ui| {
                 ui.label(None, &format!("Registering '{}' failed '{}'", reason.username, reason.reason));
                 ui.label(None, &format!("Motd = '{motd}'"));
-                //TODO
                 if ui.button(None, "Meh") {
                     tracing::trace!("Register failed acked");
                     output_cmd = Some(GuiCommand::EnterLoginView(None))
@@ -236,7 +236,6 @@ pub mod register {
             .ui(&mut *root_ui(), |ui| {
                 ui.label(None, &format!("Registering '{username}' success"));
                 ui.label(None, &format!("Motd = '{motd}'"));
-                //TODO
                 if ui.button(None, "Yay!") {
                     tracing::trace!("Register success proceed");
                     output_cmd = Some(GuiCommand::EnterLoginView(Some(LoginData {

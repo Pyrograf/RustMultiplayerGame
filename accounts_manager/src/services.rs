@@ -1,6 +1,10 @@
 use std::sync::Arc;
+use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use database_adapter::{AccountData, DatabaseAdapter, DatabaseAdapterError, DatabaseAdapterResult};
 use database_adapter::character::{CharacterData, CharacterId, NewCharacterData};
+use chrono::{Duration, Utc};
+use crate::app_data::AccountManagerClaims;
+use crate::{JWT_EXPIRATION_HOURS, SERVICE_AUDIENCE};
 
 async fn verify_password(
     username: &str,
@@ -26,6 +30,35 @@ pub async fn create_account(
     database_adapter.add_account(new_account).await?;
     Ok(())
 }
+
+pub async fn login_to_account(
+    username: String,
+    password: String,
+    database_adapter: Arc<dyn DatabaseAdapter>,
+) -> DatabaseAdapterResult<String> {
+    verify_password(&username, &password, database_adapter.clone()).await?;
+
+    let private_key = database_adapter.get_jwt_private_key().await?;
+    let key = EncodingKey::from_rsa_pem(&private_key)
+        .map_err(|e| DatabaseAdapterError::JwtError(e.to_string()))?;
+
+    let mut header = Header::new(Algorithm::RS256);
+    header.kid = Some("test".to_string()); // Change is multiple keys comes in
+
+    let utc_now = Utc::now();
+    let exp = utc_now + Duration::hours(JWT_EXPIRATION_HOURS);
+
+    let claims = AccountManagerClaims {
+        iss: username,
+        iat: utc_now.timestamp() as u64,
+        aud: SERVICE_AUDIENCE.to_string(),
+        exp: exp.timestamp() as u64,
+    };
+
+    let token = encode::<AccountManagerClaims>(&header, &claims, &key).unwrap();
+    Ok(token)
+}
+
 
 pub async fn delete_account(
     username: String,
@@ -120,6 +153,41 @@ mod tests {
             err_user_alredy_exists
         );
         assert_eq!(database_adapter.get_accounts_count().await.unwrap(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_login_to_account() {
+        let database_adapter = Arc::new(DatabaseTestAdapter::new().await);
+        let username = "User1".to_string();
+        let password = "psswdrad123456%^&*".to_string();
+
+        create_account(
+            username.clone(),
+            password.clone(),
+            database_adapter.clone(),
+        ).await
+        .unwrap();
+
+        let login_token = login_to_account(
+            username.clone(),
+            password.clone(),
+            database_adapter.clone()
+        ).await.unwrap();
+        println!("{:?}", login_token);
+
+        let bad_password_login_result = login_to_account(
+            username.clone(),
+            "Bad_password!@#".to_string(),
+            database_adapter.clone()
+        ).await;
+        assert_eq!(bad_password_login_result, Err(DatabaseAdapterError::BadPassword));
+
+        let bad_username_login_result = login_to_account(
+            "Unknownuser123".to_string(),
+            password.clone(),
+            database_adapter.clone()
+        ).await;
+        assert_eq!(bad_username_login_result, Err(DatabaseAdapterError::UsernameNotFound));
     }
 
     #[tokio::test]
