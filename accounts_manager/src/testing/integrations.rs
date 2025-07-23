@@ -54,6 +54,64 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_login_get_account_details() {
+        tests_trace_setup();
+
+        setup_server_client_interaction(|client| async move {
+            // Initially no accounts
+            let response = client.get_server_status().await.unwrap();
+            assert_eq!(response.accounts_count, 0);
+
+            let username = "User1".to_string();
+            let password = "Password1234%^&".to_string();
+
+            // First account created
+            client.request_create_account(username.clone(), password.clone() ).await.unwrap();
+
+            let token = client.request_login_to_account(username.clone(), password.clone()).await
+                .unwrap();
+
+            let _ = client.request_account_details(username.clone(), &token).await
+                .unwrap();;
+
+            let response = client.get_server_status().await.unwrap();
+            assert_eq!(response.accounts_count, 1);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_login_logout_account() {
+        tests_trace_setup();
+
+        setup_server_client_interaction(|client| async move {
+            // Initially no accounts
+            let response = client.get_server_status().await.unwrap();
+            assert_eq!(response.accounts_count, 0);
+
+            let username = "User1".to_string();
+            let password = "Password1234%^&".to_string();
+
+            // First account created
+            client.request_create_account(username.clone(), password.clone() ).await.unwrap();
+
+            let token = client.request_login_to_account(username.clone(), password.clone()).await
+                .unwrap();
+
+            let _ = client.request_account_details(username.clone(), &token).await.unwrap();
+
+            client.request_logout_account(username.clone(),token).await.unwrap();
+
+            let request_details_err = client.request_account_details(username.clone(), &"notoken:(".to_string()).await;
+            assert!(matches!(request_details_err, Err(AccountsManagerClientError::Unauthorized)));
+
+            let response = client.get_server_status().await.unwrap();
+            assert_eq!(response.accounts_count, 1);
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn test_creating_account_should_not_create_already_existing_account() {
         tests_trace_setup();
 
@@ -110,8 +168,11 @@ mod tests {
             let response = client.get_server_status().await.unwrap();
             assert_eq!(response.accounts_count, 1);
 
+            let token = client.request_login_to_account(username.to_string(), password.to_string()).await
+                .unwrap();
+
             // Delete account with correct password
-            client.request_delete_account(username.to_string(), password.to_string())
+            client.request_delete_account(username.to_string(), token)
                 .await
                 .unwrap();
 
@@ -121,7 +182,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_deleting_account_with_bad_password_should_fail() {
+    async fn test_deleting_account_with_bad_token_should_fail() {
         tests_trace_setup();
 
         setup_server_client_interaction(|client| async move {
@@ -130,24 +191,28 @@ mod tests {
             assert_eq!(response.accounts_count, 0);
 
             let username = "User1";
+            let password = "Password1234%^&";
 
             // First account created
-            client.request_create_account(username.to_string(), "Password1234%^&".to_string())
+            client.request_create_account(username.to_string(), password.to_string())
                 .await
                 .unwrap();
 
             let response = client.get_server_status().await.unwrap();
             assert_eq!(response.accounts_count, 1);
 
+            let _token = client.request_login_to_account(username.to_string(), password.to_string()).await
+                .unwrap();
+
             // Delete account with bad password
-            let deletion_error = client.request_delete_account(username.to_string(), "Password1234%^".to_string())
+            let deletion_error = client.request_delete_account(username.to_string(), "bad_token1234".to_string())
                 .await
                 .unwrap_err();
 
             let response = client.get_server_status().await.unwrap();
             assert_eq!(response.accounts_count, 1); // Count remains the same
 
-            assert!(matches!(deletion_error, AccountsManagerClientError::ApiError(ApiError::DatabaseAdapterError(DatabaseAdapterError::BadPassword))));
+            assert!(matches!(deletion_error, AccountsManagerClientError::Unauthorized));
 
         }).await;
     }
@@ -194,16 +259,20 @@ mod tests {
             client.request_create_account(username.to_string(), password_old.to_string())
                 .await
                 .unwrap();
+
+            let token = client.request_login_to_account(username.to_string(), password_old.to_string())
+                .await
+                .unwrap();
             
             // Change password with correct old password
             let password_new = "Password1234%^&111111111";
-            client.request_update_account_password(username.to_string(), password_old.to_string(), password_new.to_string())
+            client.request_update_account_password(username.to_string(), password_old.to_string(), password_new.to_string(), &token)
                 .await
                 .unwrap();
 
             let password_old_incorrect = password_old;
             
-            let update_password_error = client.request_update_account_password(username.to_string(), password_old_incorrect.to_string(), "sometingdontcare".to_string())
+            let update_password_error = client.request_update_account_password(username.to_string(), password_old_incorrect.to_string(), "sometingdontcare".to_string(), &token)
                 .await
                 .unwrap_err();
             

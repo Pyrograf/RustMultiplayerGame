@@ -1,7 +1,7 @@
 use std::io::ErrorKind;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use crate::app_data::AppData;
+use crate::app_data::{AccountManagerClaims, AppData};
 use tower_http::trace::{
     DefaultMakeSpan,
     DefaultOnRequest,
@@ -22,20 +22,21 @@ mod testing;
 pub const SERVICE_AUDIENCE: &str = "accounts_manager";
 pub const JWT_EXPIRATION_HOURS: i64 = 1;
 
+pub type JwtToken = String;
+
 #[derive(Debug)]
 pub struct AccountsManagerServer {
     task_handle: tokio::task::JoinHandle<Result<(), std::io::Error>>,
     shutdown_tx: Option<tokio::sync::oneshot::Sender<()>>,
     address: std::net::SocketAddr,
-    app_data: Arc<Mutex<AppData>>,
 }
 
 impl AccountsManagerServer {
     pub async fn run(database_adapter: Arc<dyn DatabaseAdapter>) -> tokio::io::Result<Self> {
 
-        let app_data = Arc::new(Mutex::new(AppData::new(database_adapter).await));
+        let app_data = AppData::new(database_adapter).await;
 
-        let app = router::get_router(app_data.clone())
+        let app = router::get_router(app_data)
             .layer(TraceLayer::new_for_http()
                        .make_span_with(DefaultMakeSpan::new().include_headers(true))
                        .on_request(DefaultOnRequest::new().level(tracing::Level::DEBUG))
@@ -62,7 +63,6 @@ impl AccountsManagerServer {
                 task_handle,
                 shutdown_tx: Some(shutdown_tx),
                 address,
-                app_data,
             }
         )
     }

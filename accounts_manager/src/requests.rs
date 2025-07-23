@@ -6,9 +6,8 @@ pub struct CreateAccountRequest {
     pub username: String,
     pub password: String,
 }
-
 #[derive(Debug, Serialize, Deserialize)]
-pub struct DeleteAccountRequestBody {
+pub struct LoginAccountRequest {
     pub password: String,
 }
 

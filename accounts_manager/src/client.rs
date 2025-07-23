@@ -1,8 +1,9 @@
-use crate::requests::{CreateAccountRequest, DeleteAccountRequestBody, NewCharacterRequest, UpdatePasswordRequest};
-use crate::responses::{AccountsServerStatus, ApiError};
+use crate::requests::{CreateAccountRequest, LoginAccountRequest, NewCharacterRequest, UpdatePasswordRequest};
+use crate::responses::{AccountDetails, AccountsServerStatus, ApiError};
 use reqwest::{Client as HttpClient, Response, StatusCode};
 use std::time::Duration;
 use database_adapter::character::{CharacterData, CharacterId};
+use crate::{JwtToken};
 
 pub struct AccountsManagerClient {
     base_url: String,
@@ -22,6 +23,12 @@ pub enum AccountsManagerClientError {
 
     #[error("Timeout")]
     Timeout,
+
+    #[error("Unauthorized")]
+    Unauthorized,
+
+    #[error("Unexpected")]
+    Unexpected(String),
 }
 
 pub type AccountsManagerClientResult<T> = Result<T, AccountsManagerClientError>;
@@ -43,11 +50,9 @@ impl AccountsManagerClient {
 
     pub async fn get_server_status(&self) -> AccountsManagerClientResult<AccountsServerStatus> {
         let url = format!("{}/", self.base_url);
-        let resp = self
-            .http_client
+        let resp = self.http_client
             .get(&url)
-            .send()
-            .await?
+            .send().await?
             .error_for_status()?;
         let status = resp.json::<AccountsServerStatus>().await?;
         Ok(status)
@@ -60,29 +65,80 @@ impl AccountsManagerClient {
     ) -> AccountsManagerClientResult<()> {
         let url = format!("{}/api/account/create", self.base_url);
         let request_payload = CreateAccountRequest { username, password };
-        let resp = self
-            .http_client
+        let resp = self.http_client
             .post(&url)
             .json(&request_payload)
-            .send()
-            .await?;
+            .send().await?;
 
         Self::handle_account_manage_response(resp, StatusCode::CREATED).await
+    }
+
+    pub async fn request_login_to_account(
+        &self,
+        username: String,
+        password: String,
+    ) -> AccountsManagerClientResult<String> {
+        let url = format!("{}/api/accounts/{}/login", self.base_url, username);
+        let request_payload = LoginAccountRequest { password };
+        let resp = self.http_client
+            .post(&url)
+            .json(&request_payload)
+            .send().await?;
+
+        let token = resp.json::<JwtToken>().await?;
+        Ok(token)
+    }
+
+    pub async fn request_logout_account(
+        &self,
+        username: String,
+        token: JwtToken,
+    ) -> AccountsManagerClientResult<()> {
+        let url = format!("{}/api/accounts/{}/logout", self.base_url, username);
+        let resp = self.http_client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", token))
+            .send().await?;
+
+        Self::handle_account_manage_response(resp, StatusCode::OK).await
+    }
+
+    pub async fn request_account_details(
+        &self,
+        username: String,
+        token: &JwtToken,
+    ) -> AccountsManagerClientResult<AccountDetails> {
+        let url = format!("{}/api/accounts/{}", self.base_url, username);
+        let resp = self.http_client
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", token))
+            .send().await?;
+
+        match resp.status() {
+            StatusCode::OK => {
+                let details = resp.json::<AccountDetails>().await?;
+                Ok(details)
+            },
+            StatusCode::UNAUTHORIZED => {
+                Err(AccountsManagerClientError::Unauthorized)
+            },
+            _ => {
+                Err(AccountsManagerClientError::Unexpected(resp.text().await?))
+            }
+        }
+
     }
 
     pub async fn request_delete_account(
         &self,
         username: String,
-        password: String,
+        token: JwtToken,
     ) -> AccountsManagerClientResult<()> {
         let url = format!("{}/api/accounts/{}", self.base_url, username);
-        let request_payload = DeleteAccountRequestBody { password };
-        let resp = self
-            .http_client
+        let resp = self.http_client
             .delete(&url)
-            .json(&request_payload)
-            .send()
-            .await?;
+            .header("Authorization", format!("Bearer {}", token))
+            .send().await?;
 
         Self::handle_account_manage_response(resp, StatusCode::OK).await
     }
@@ -92,15 +148,15 @@ impl AccountsManagerClient {
         username: String,
         password_old: String,
         password_new: String,
+        token: &JwtToken,
     ) -> AccountsManagerClientResult<()> {
         let url = format!("{}/api/accounts/{}/password", self.base_url, username);
         let request_payload = UpdatePasswordRequest { password_old, password_new };
-        let resp = self
-            .http_client
+        let resp = self.http_client
             .patch(&url)
+            .header("Authorization", format!("Bearer {}", token))
             .json(&request_payload)
-            .send()
-            .await?;
+            .send().await?;
 
         Self::handle_account_manage_response(resp, StatusCode::OK).await
     }
@@ -110,15 +166,15 @@ impl AccountsManagerClient {
         username: String,
         password: String,
         character_name: String,
+        token: &JwtToken,
     ) -> AccountsManagerClientResult<CharacterId> {
         let url = format!("{}/api/accounts/{}/character/new", self.base_url, username);
         let request_payload = NewCharacterRequest { password, character_name };
-        let resp = self
-            .http_client
+        let resp = self.http_client
             .post(&url)
+            .header("Authorization", format!("Bearer {}", token))
             .json(&request_payload)
-            .send()
-            .await?;
+            .send().await?;
 
         let status = resp.json::<CharacterId>().await?;
         Ok(status)
@@ -127,13 +183,13 @@ impl AccountsManagerClient {
     pub async fn request_account_characters(
         &self,
         username: String,
+        token: &JwtToken,
     ) -> AccountsManagerClientResult<Vec<CharacterData>> {
         let url = format!("{}/api/accounts/{}/characters", self.base_url, username);
-        let resp = self
-            .http_client
+        let resp = self.http_client
             .get(&url)
-            .send()
-            .await?;
+            .header("Authorization", format!("Bearer {}", token))
+            .send().await?;
 
         let status = resp.json::<Vec<CharacterData>>().await?;
         Ok(status)

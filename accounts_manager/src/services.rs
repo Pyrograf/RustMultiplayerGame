@@ -4,7 +4,7 @@ use database_adapter::{AccountData, DatabaseAdapter, DatabaseAdapterError, Datab
 use database_adapter::character::{CharacterData, CharacterId, NewCharacterData};
 use chrono::{Duration, Utc};
 use crate::app_data::AccountManagerClaims;
-use crate::{JWT_EXPIRATION_HOURS, SERVICE_AUDIENCE};
+use crate::{JwtToken, JWT_EXPIRATION_HOURS, SERVICE_AUDIENCE};
 
 async fn verify_password(
     username: &str,
@@ -15,7 +15,7 @@ async fn verify_password(
         .get_account_by_name(&username).await?;
     let password_matches = account.verify(&password)?;
     if !password_matches {
-        return Err(DatabaseAdapterError::BadPassword);
+        Err(DatabaseAdapterError::BadPassword)
     } else {
         Ok(())
     }
@@ -35,7 +35,7 @@ pub async fn login_to_account(
     username: String,
     password: String,
     database_adapter: Arc<dyn DatabaseAdapter>,
-) -> DatabaseAdapterResult<String> {
+) -> DatabaseAdapterResult<JwtToken> {
     verify_password(&username, &password, database_adapter.clone()).await?;
 
     let private_key = database_adapter.get_jwt_private_key().await?;
@@ -62,10 +62,8 @@ pub async fn login_to_account(
 
 pub async fn delete_account(
     username: String,
-    password: String,
     database_adapter: Arc<dyn DatabaseAdapter>,
 ) -> DatabaseAdapterResult<()> {
-    verify_password(&username, &password, database_adapter.clone()).await?;
     database_adapter.remove_account_with_username(&username).await?;
     Ok(())
 }
@@ -90,7 +88,6 @@ pub async fn get_characters_of_account(
 
 pub async fn create_character_for_account(
     username: String,
-    password: String,
     character_name: String,
     database_adapter: Arc<dyn DatabaseAdapter>,
 ) -> DatabaseAdapterResult<CharacterId> {
@@ -192,6 +189,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_account() {
+        // Deleting account assume user is verified
         let database_adapter = Arc::new(DatabaseTestAdapter::new().await);
 
         let account_1 = AccountData::new("User11".to_string(), "qwertyuio12345$%^&").unwrap();
@@ -199,14 +197,12 @@ mod tests {
         assert_eq!(database_adapter.get_accounts_count().await.unwrap(), 1);
 
         let account_2_user = "User12";
-        let account_2_psswrd = "mehmeh12345$%^&";
-        let account_2 = AccountData::new(account_2_user.to_string(), account_2_psswrd).unwrap();
+        let account_2 = AccountData::new(account_2_user.to_string(), "mehmeh12345$%^&").unwrap();
         database_adapter.add_account(account_2).await.unwrap();
         assert_eq!(database_adapter.get_accounts_count().await.unwrap(), 2);
 
         delete_account(
             account_2_user.to_string(),
-            account_2_psswrd.to_string(),
             database_adapter.clone(),
         ).await
         .unwrap();
@@ -214,7 +210,6 @@ mod tests {
 
         let err_user_not_found = delete_account(
             account_2_user.to_string(),
-            account_2_psswrd.to_string(),
             database_adapter.clone(),
         ).await
         .unwrap_err();

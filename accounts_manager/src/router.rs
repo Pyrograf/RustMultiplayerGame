@@ -9,19 +9,23 @@ use axum::{
 use axum::routing::{delete, patch};
 use tokio::sync::Mutex;
 
-pub fn get_router(app_data: Arc<Mutex<AppData>>) -> Router {
+pub fn get_router(app_data: AppData) -> Router {
     let api_routes = Router::new()
         .route(
             "/account/create",
             post(create_account),
         )
         .route(
-            "/account/login",
+            "/accounts/{username}/login",
             post(login_to_account),
         )
         .route(
+            "/accounts/{username}/logout",
+            post(logout_account),
+        )
+        .route(
             "/accounts/{username}",
-            delete(delete_account)
+            get(get_account_details).delete(delete_account)
         )
         .route(
             "/accounts/{username}/password",
@@ -34,10 +38,10 @@ pub fn get_router(app_data: Arc<Mutex<AppData>>) -> Router {
         .route(
             "/accounts/{username}/character/new",
             post(create_character_for_account)
-        )
-        .with_state(app_data.clone());
+        );
 
     Router::new()
-        .route("/", get(overall_status).with_state(app_data.clone()))
+        .route("/", get(overall_status))
         .nest("/api", api_routes)
+        .with_state(app_data)
 }

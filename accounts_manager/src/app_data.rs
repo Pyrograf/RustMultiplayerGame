@@ -1,6 +1,6 @@
-use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
+use axum::extract::FromRef;
 use axum_jwt_auth::{JwtDecoderState, LocalDecoder};
 use jsonwebtoken::{Algorithm, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
@@ -15,6 +15,7 @@ pub struct AccountManagerClaims {
     pub exp: u64,           // Required. Expiration time (as UTC timestamp)
 }
 
+#[derive(FromRef, Clone)]
 pub struct AppData {
     pub database_adapter: Arc<dyn DatabaseAdapter>,
     pub jwt_decoder: JwtDecoderState<AccountManagerClaims>,
