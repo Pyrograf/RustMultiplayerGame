@@ -19,6 +19,5 @@ pub struct UpdatePasswordRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NewCharacterRequest {
-    pub password: String,
     pub character_name: String,
 }

@@ -26,9 +26,6 @@ pub enum AccountsManagerClientError {
 
     #[error("Unauthorized")]
     Unauthorized,
-
-    #[error("Unexpected")]
-    Unexpected(String),
 }
 
 pub type AccountsManagerClientResult<T> = Result<T, AccountsManagerClientError>;
@@ -49,13 +46,12 @@ impl AccountsManagerClient {
     }
 
     pub async fn get_server_status(&self) -> AccountsManagerClientResult<AccountsServerStatus> {
-        let url = format!("{}/", self.base_url);
         let resp = self.http_client
-            .get(&url)
+            .get(&format!("{}/", self.base_url))
             .send().await?
             .error_for_status()?;
-        let status = resp.json::<AccountsServerStatus>().await?;
-        Ok(status)
+
+        resp.json().await.map_err(Into::into)
     }
 
     pub async fn request_create_account(
@@ -63,14 +59,24 @@ impl AccountsManagerClient {
         username: String,
         password: String,
     ) -> AccountsManagerClientResult<()> {
-        let url = format!("{}/api/account/create", self.base_url);
         let request_payload = CreateAccountRequest { username, password };
         let resp = self.http_client
-            .post(&url)
+            .post(&format!("{}/api/account/create", self.base_url))
             .json(&request_payload)
             .send().await?;
 
-        Self::handle_account_manage_response(resp, StatusCode::CREATED).await
+        match resp.status() {
+            StatusCode::CREATED => Ok(()),
+            status => {
+                let reason = resp.text().await?;
+                Err(
+                    match serde_json::from_str::<ApiError>(&reason) {
+                        Ok(err) => err.into(),
+                        Err(_) => AccountsManagerClientError::OtherError { status, reason },
+                    }
+                )
+            }
+        }
     }
 
     pub async fn request_login_to_account(
@@ -78,15 +84,13 @@ impl AccountsManagerClient {
         username: String,
         password: String,
     ) -> AccountsManagerClientResult<String> {
-        let url = format!("{}/api/accounts/{}/login", self.base_url, username);
         let request_payload = LoginAccountRequest { password };
         let resp = self.http_client
-            .post(&url)
+            .post(&format!("{}/api/accounts/{}/login", self.base_url, username))
             .json(&request_payload)
             .send().await?;
 
-        let token = resp.json::<JwtToken>().await?;
-        Ok(token)
+        Ok(resp.json().await?)
     }
 
     pub async fn request_logout_account(
@@ -100,7 +104,19 @@ impl AccountsManagerClient {
             .header("Authorization", format!("Bearer {}", token))
             .send().await?;
 
-        Self::handle_account_manage_response(resp, StatusCode::OK).await
+        match resp.status() {
+            StatusCode::OK => Ok(()),
+            StatusCode::UNAUTHORIZED => Err(AccountsManagerClientError::Unauthorized),
+            status => {
+                let reason = resp.text().await?;
+                Err(
+                    match serde_json::from_str::<ApiError>(&reason) {
+                        Ok(err) => err.into(),
+                        Err(_) => AccountsManagerClientError::OtherError { status, reason },
+                    }
+                )
+            }
+        }
     }
 
     pub async fn request_account_details(
@@ -108,25 +124,24 @@ impl AccountsManagerClient {
         username: String,
         token: &JwtToken,
     ) -> AccountsManagerClientResult<AccountDetails> {
-        let url = format!("{}/api/accounts/{}", self.base_url, username);
         let resp = self.http_client
-            .get(&url)
+            .get(&format!("{}/api/accounts/{}", self.base_url, username))
             .header("Authorization", format!("Bearer {}", token))
             .send().await?;
 
         match resp.status() {
-            StatusCode::OK => {
-                let details = resp.json::<AccountDetails>().await?;
-                Ok(details)
-            },
-            StatusCode::UNAUTHORIZED => {
-                Err(AccountsManagerClientError::Unauthorized)
-            },
-            _ => {
-                Err(AccountsManagerClientError::Unexpected(resp.text().await?))
+            StatusCode::OK => Ok(resp.json().await?),
+            StatusCode::UNAUTHORIZED => Err(AccountsManagerClientError::Unauthorized),
+            status => {
+                let reason = resp.text().await?;
+                Err(
+                    match serde_json::from_str::<ApiError>(&reason) {
+                        Ok(err) => err.into(),
+                        Err(_) => AccountsManagerClientError::OtherError { status, reason },
+                    }
+                )
             }
         }
-
     }
 
     pub async fn request_delete_account(
@@ -134,14 +149,26 @@ impl AccountsManagerClient {
         username: String,
         token: JwtToken,
     ) -> AccountsManagerClientResult<()> {
-        let url = format!("{}/api/accounts/{}", self.base_url, username);
         let resp = self.http_client
-            .delete(&url)
+            .delete(&format!("{}/api/accounts/{}", self.base_url, username))
             .header("Authorization", format!("Bearer {}", token))
             .send().await?;
 
-        Self::handle_account_manage_response(resp, StatusCode::OK).await
+        match resp.status() {
+            StatusCode::OK => Ok(()),
+            StatusCode::UNAUTHORIZED => Err(AccountsManagerClientError::Unauthorized),
+            status => {
+                let reason = resp.text().await?;
+                Err(
+                    match serde_json::from_str::<ApiError>(&reason) {
+                        Ok(err) => err.into(),
+                        Err(_) => AccountsManagerClientError::OtherError { status, reason },
+                    }
+                )
+            }
+        }
     }
+
 
     pub async fn request_update_account_password(
         &self,
@@ -150,34 +177,55 @@ impl AccountsManagerClient {
         password_new: String,
         token: &JwtToken,
     ) -> AccountsManagerClientResult<()> {
-        let url = format!("{}/api/accounts/{}/password", self.base_url, username);
         let request_payload = UpdatePasswordRequest { password_old, password_new };
         let resp = self.http_client
-            .patch(&url)
+            .patch(&format!("{}/api/accounts/{}/password", self.base_url, username))
             .header("Authorization", format!("Bearer {}", token))
             .json(&request_payload)
             .send().await?;
 
-        Self::handle_account_manage_response(resp, StatusCode::OK).await
+        match resp.status() {
+            StatusCode::OK => Ok(()),
+            StatusCode::UNAUTHORIZED => Err(AccountsManagerClientError::Unauthorized),
+            status => {
+                let reason = resp.text().await?;
+                Err(
+                    match serde_json::from_str::<ApiError>(&reason) {
+                        Ok(err) => err.into(),
+                        Err(_) => AccountsManagerClientError::OtherError { status, reason },
+                    }
+                )
+            }
+        }
     }
+
 
     pub async fn request_create_character(
         &self,
         username: String,
-        password: String,
         character_name: String,
         token: &JwtToken,
     ) -> AccountsManagerClientResult<CharacterId> {
-        let url = format!("{}/api/accounts/{}/character/new", self.base_url, username);
-        let request_payload = NewCharacterRequest { password, character_name };
+        let request_payload = NewCharacterRequest { character_name };
         let resp = self.http_client
-            .post(&url)
+            .post(&format!("{}/api/accounts/{}/character/new", self.base_url, username))
             .header("Authorization", format!("Bearer {}", token))
             .json(&request_payload)
             .send().await?;
 
-        let status = resp.json::<CharacterId>().await?;
-        Ok(status)
+        match resp.status() {
+            StatusCode::OK => Ok(resp.json().await?),
+            StatusCode::UNAUTHORIZED => Err(AccountsManagerClientError::Unauthorized),
+            status => {
+                let reason = resp.text().await?;
+                Err(
+                    match serde_json::from_str::<ApiError>(&reason) {
+                        Ok(err) => err.into(),
+                        Err(_) => AccountsManagerClientError::OtherError { status, reason },
+                    }
+                )
+            }
+        }
     }
 
     pub async fn request_account_characters(
@@ -185,29 +233,23 @@ impl AccountsManagerClient {
         username: String,
         token: &JwtToken,
     ) -> AccountsManagerClientResult<Vec<CharacterData>> {
-        let url = format!("{}/api/accounts/{}/characters", self.base_url, username);
         let resp = self.http_client
-            .get(&url)
+            .get(&format!("{}/api/accounts/{}/characters", self.base_url, username))
             .header("Authorization", format!("Bearer {}", token))
             .send().await?;
 
-        let status = resp.json::<Vec<CharacterData>>().await?;
-        Ok(status)
-    }
-
-    async fn handle_account_manage_response(
-        resp: Response,
-        expected_status: StatusCode
-    ) -> AccountsManagerClientResult<()> {
-        let status = resp.status();
-        if expected_status == status {
-            Ok(())
-        } else {
-            let reason = resp.text().await?;
-            Err(match serde_json::from_str::<ApiError>(&reason) {
-                Ok(err) => err.into(),
-                Err(_) => AccountsManagerClientError::OtherError { status, reason },
-            })
+        match resp.status() {
+            StatusCode::OK => Ok(resp.json().await?),
+            StatusCode::UNAUTHORIZED => Err(AccountsManagerClientError::Unauthorized),
+            status => {
+                let reason = resp.text().await?;
+                Err(
+                    match serde_json::from_str::<ApiError>(&reason) {
+                        Ok(err) => err.into(),
+                        Err(_) => AccountsManagerClientError::OtherError { status, reason },
+                    }
+                )
+            }
         }
     }
 }
