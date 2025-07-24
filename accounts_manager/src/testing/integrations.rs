@@ -79,6 +79,17 @@ mod tests {
         })
         .await;
     }
+    #[tokio::test]
+    async fn test_login_not_existing_account_should_fail() {
+        tests_trace_setup();
+
+        setup_server_client_interaction(|client| async move {
+            let login_result = client.request_login_to_account("1234".to_string(), "password".to_string()).await
+                .unwrap_err();
+            assert!(matches!(login_result, AccountsManagerClientError::ApiError(ApiError::DatabaseAdapterError(DatabaseAdapterError::UsernameNotFound))));
+        })
+        .await;
+    }
 
     #[tokio::test]
     async fn test_login_logout_account() {

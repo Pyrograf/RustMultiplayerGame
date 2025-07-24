@@ -72,13 +72,19 @@ pub mod login {
         let mut output_cmd = None;
 
         widgets::Window::new(hash!(), window_position, window_size)
-            .label("Launcher - Login")
+            .label("Launcher - Login Failed")
             .movable(false)
             .titlebar(true)
             .ui(&mut *root_ui(), |ui| {
                 ui.label(None, &format!("Loggining to '{}' failed reason '{}'", reason.username, reason.reason));
                 ui.label(None, &format!("Motd = '{motd}'"));
-                //TODO
+                if ui.button(None, "Try again") {
+                    let login_data = LoginData {
+                        username: reason.username.clone(),
+                        ..LoginData::default()
+                    };
+                    output_cmd = Some(GuiCommand::EnterLoginView(Some(login_data)));
+                }
             });
 
         output_cmd

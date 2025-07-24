@@ -115,10 +115,10 @@ impl GuiRenderer {
                     GuiStateLogin::Failed(reason) => {
                         show_login_failed(window_position, window_size, motd, reason)
                     },
-                    GuiStateLogin::Success(username) => {
+                    GuiStateLogin::Success(loggedin) => {
                         // Probably will be expanded later to CRUD characters
                         // TODO proceed
-                        show_login_success(window_position, window_size, motd, username)
+                        show_login_success(window_position, window_size, motd, &loggedin.username)
                     },
                 },
                 GuiStateServerOk::Register(state_register) => match state_register {

@@ -1,3 +1,4 @@
+use accounts_manager::JwtToken;
 use crate::gui::{LoginData, LoginFailedReason, RegisterData, RegisterFailedReason};
 
 #[derive(Debug, PartialOrd, PartialEq)]
@@ -19,7 +20,7 @@ pub enum GuiCommand {
     
     PassLoginData(LoginData),
     LoginFailed(LoginFailedReason),
-    LoginSuccess,
+    LoginSuccess((String, JwtToken)),
     
     PassRegisterData(RegisterData),
     RegisterFailed(RegisterFailedReason),

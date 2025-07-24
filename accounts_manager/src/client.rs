@@ -83,14 +83,25 @@ impl AccountsManagerClient {
         &self,
         username: String,
         password: String,
-    ) -> AccountsManagerClientResult<String> {
+    ) -> AccountsManagerClientResult<JwtToken> {
         let request_payload = LoginAccountRequest { password };
         let resp = self.http_client
             .post(&format!("{}/api/accounts/{}/login", self.base_url, username))
             .json(&request_payload)
             .send().await?;
-
-        Ok(resp.json().await?)
+        
+        match resp.status() {
+            StatusCode::OK => Ok(resp.json().await?),
+            status => {
+                let reason = resp.text().await?;
+                Err(
+                    match serde_json::from_str::<ApiError>(&reason) {
+                        Ok(err) => err.into(),
+                        Err(_) => AccountsManagerClientError::OtherError { status, reason },
+                    }
+                )
+            }
+        }
     }
 
     pub async fn request_logout_account(

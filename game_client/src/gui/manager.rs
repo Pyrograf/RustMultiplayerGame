@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
+use accounts_manager::JwtToken;
 use crate::backend_logic::BackendLogic;
 use crate::gui::commands::GuiCommand;
 use crate::gui::{LoginData, LoginFailedReason, RegisterData, RegisterFailedReason};
@@ -56,16 +57,32 @@ impl GuiManager {
             GuiState::ServerIsOk { motd, state} => match state {
                 GuiStateServerOk::Login(state_login) => match state_login {
                     GuiStateLogin::ProcessingData(login_data) => {
+                        // Should enter here after clicking login
                         tracing::info!("Login - processing");
-
-                        // TODO login
-                        // self.backend_logic.
-                        // self.request_gui_command(GuiCo)
+                        let login_account_result = self.backend_logic.request_login_to_account(login_data.clone());
+                        let gcmd = match login_account_result {
+                            Ok(token) => {
+                                tracing::info!("Login account '{}' success!", login_data.username);
+                                GuiCommand::LoginSuccess((login_data.username.clone(), token))
+                            },
+                            Err(error) => {
+                                tracing::error!("Login account '{}' failed! reason '{}'", login_data.username, error.to_string());
+                                GuiCommand::LoginFailed(LoginFailedReason {
+                                    username: login_data.username.clone(),
+                                    reason: error.to_string()
+                                })
+                            }
+                        };
+                        self.request_gui_command(gcmd);
+                    },
+                    GuiStateLogin::Success(loggedin) => {
+                        tracing::info!("Loggedin - success! {loggedin:?}");
                     },
                     _ => {}
                 },
                 GuiStateServerOk::Register(state_register) => match state_register {
                     GuiStateRegister::ProcessingData(register_data) => {
+                        // Should enter here after clicking register
                         tracing::info!("Register - processing");
                         let register_account_result = self.backend_logic.request_register_new_account(register_data.clone());
                         let gcmd = match register_account_result {
@@ -153,11 +170,11 @@ impl GuiManager {
                         tracing::warn!("Bad state")
                     }
                 },
-                GuiCommand::LoginSuccess => {
+                GuiCommand::LoginSuccess((username, jwt_token)) => {
                     if let GuiState::ServerIsOk { motd, state } = &mut self.state {
                         self.state = GuiState::ServerIsOk {
                             motd: motd.clone(),
-                            state: GuiStateServerOk::Login(GuiStateLogin::Success("Huh unknown?".to_owned()))
+                            state: GuiStateServerOk::Login(GuiStateLogin::Success(GuiStateLoggedin { username, jwt_token }))
                         }
                     } else {
                         tracing::warn!("Bad state")
@@ -238,7 +255,7 @@ pub enum GuiStateLogin {
     EnteringData(LoginData),
     ProcessingData(LoginData),
     Failed(LoginFailedReason), // need some option to collect notifications, ACK come back to entering data
-    Success(String), // meybe add inner data
+    Success(GuiStateLoggedin), // meybe add inner data
 }
 
 #[derive(Debug)]
@@ -247,4 +264,10 @@ pub enum GuiStateRegister {
     ProcessingData(RegisterData),
     Failed(RegisterFailedReason), // need some option to collect notifications, ACK come back to entering data
     Success(String), // Back to login option
+}
+
+#[derive(Debug)]
+pub struct GuiStateLoggedin {
+    pub username: String,
+    pub jwt_token: JwtToken,
 }
